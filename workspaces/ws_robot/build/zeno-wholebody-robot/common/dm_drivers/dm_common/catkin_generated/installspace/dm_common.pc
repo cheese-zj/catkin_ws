@@ -1,8 +1,0 @@
-prefix=/home/jameszhao2004/catkin_ws/workspaces/ws_robot/install
-
-Name: dm_common
-Description: Description of dm_common
-Version: 0.0.0
-Cflags: -I${prefix}/include
-Libs: -L${prefix}/lib 
-Requires: 

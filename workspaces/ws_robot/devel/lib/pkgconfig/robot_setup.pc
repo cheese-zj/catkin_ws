@@ -1,8 +1,0 @@
-prefix=/home/jameszhao2004/catkin_ws/workspaces/ws_robot/devel
-
-Name: robot_setup
-Description: Description of robot_setup
-Version: 0.0.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 

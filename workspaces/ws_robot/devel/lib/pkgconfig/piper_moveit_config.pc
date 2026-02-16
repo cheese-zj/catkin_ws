@@ -1,8 +1,0 @@
-prefix=/home/jameszhao2004/catkin_ws/workspaces/ws_robot/devel
-
-Name: piper_moveit_config
-Description: Description of piper_moveit_config
-Version: 0.3.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 

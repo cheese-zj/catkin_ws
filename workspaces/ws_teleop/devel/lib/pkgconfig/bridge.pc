@@ -1,8 +1,0 @@
-prefix=/home/jameszhao2004/catkin_ws/workspaces/ws_teleop/devel
-
-Name: bridge
-Description: Description of bridge
-Version: 0.0.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: geometry_msgs roscpp rospy std_msgs dm_hw

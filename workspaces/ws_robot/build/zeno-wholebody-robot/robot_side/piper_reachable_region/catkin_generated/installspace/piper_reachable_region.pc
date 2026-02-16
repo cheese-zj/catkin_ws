@@ -1,8 +1,0 @@
-prefix=/home/jameszhao2004/catkin_ws/workspaces/ws_robot/install
-
-Name: piper_reachable_region
-Description: Description of piper_reachable_region
-Version: 0.0.0
-Cflags: 
-Libs: -L${prefix}/lib 
-Requires: 
