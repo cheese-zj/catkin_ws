@@ -1,0 +1,26 @@
+# Catkin / ROS build artifacts
+/build/
+/devel/
+/install/
+/logs/
+
+# Role-isolated workspace artifacts
+/workspaces/ws_robot/build/
+/workspaces/ws_robot/devel/
+/workspaces/ws_robot/install/
+/workspaces/ws_teleop/build/
+/workspaces/ws_teleop/devel/
+/workspaces/ws_teleop/install/
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+
+# ROS runtime logs/state
+.ros/
+*.log
