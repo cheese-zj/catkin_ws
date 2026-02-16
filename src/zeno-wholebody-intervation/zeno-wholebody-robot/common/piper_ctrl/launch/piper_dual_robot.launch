@@ -1,0 +1,53 @@
+<launch>
+  <!-- 
+    Piper Dual Robot Launch
+    
+    Parameter loading order:
+    1. piper_ctrl_mit.yaml - Control parameters (kp, kd, rates, filter)
+    2. piper_dual.yaml - Node-specific parameters (can_port, topics, gripper)
+    
+    piper_dual.yaml is loaded to root namespace where node name keys 
+    (e.g., piper_ctrl_left_node) map to each node's private namespace.
+  -->
+
+  <!-- Left arm node -->
+  <node name="piper_ctrl_left_node" pkg="piper_ctrl" type="piper_ctrl_node.py" output="screen">
+    <!-- Load control parameters to node's private namespace -->
+    <rosparam file="$(find piper_ctrl)/config/piper_ctrl_mit.yaml" command="load"/>
+    <!-- Load node-specific parameters (piper_ctrl_left_node key maps to this node) -->
+    <rosparam file="$(find piper_ctrl)/config/piper_dual.yaml" command="load" ns="/"/>
+  </node>
+
+    <node pkg="topic_tools" type="mux" name="mux_arm_left_joint"
+          args="/robot/arm_left/joint_cmd_mux
+                /robot/arm_left/vla_joint_cmd
+                /teleop/arm_left/joint_states_single"
+          output="screen">
+        <param name="~default" value="/teleop/arm_left/joint_states_single" /> 
+    </node>  
+
+
+  <!-- Right arm node -->
+  <node name="piper_ctrl_right_node" pkg="piper_ctrl" type="piper_ctrl_node.py" output="screen">
+    <!-- Load control parameters to node's private namespace -->
+    <rosparam file="$(find piper_ctrl)/config/piper_ctrl_mit.yaml" command="load"/>
+    <!-- Load node-specific parameters (piper_ctrl_right_node key maps to this node) -->
+    <rosparam file="$(find piper_ctrl)/config/piper_dual.yaml" command="load" ns="/"/>
+  </node>
+<!-- 这个是可以选择joint话题，即用什么 -->
+    <node pkg="topic_tools" type="mux" name="mux_arm_right_joint"
+          args="/robot/arm_right/joint_cmd_mux
+                /robot/arm_right/vla_joint_cmd
+                /teleop/arm_right/joint_states_single"
+          output="screen">
+        <param name="~default" value="/teleop/arm_right/joint_states_single"/>
+    </node>
+
+  <!-- 启动后自动选择 teleop 模式 -->
+  <node pkg="rosservice" type="rosservice" name="init_mux_left"
+        args="call --wait /robot/arm_left/joint_cmd_mux_select /teleop/arm_left/joint_states_single"
+        output="screen"/>
+  <node pkg="rosservice" type="rosservice" name="init_mux_right"
+        args="call --wait /robot/arm_right/joint_cmd_mux_select /teleop/arm_right/joint_states_single"
+        output="screen"/> 
+</launch>

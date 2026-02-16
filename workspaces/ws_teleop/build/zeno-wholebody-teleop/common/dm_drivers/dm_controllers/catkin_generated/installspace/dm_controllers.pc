@@ -1,0 +1,8 @@
+prefix=/home/jameszhao2004/catkin_ws/workspaces/ws_teleop/install
+
+Name: dm_controllers
+Description: Description of dm_controllers
+Version: 0.0.0
+Cflags: -I${prefix}/include
+Libs: -L${prefix}/lib -ldm_controllers
+Requires: controller_interface hardware_interface pluginlib roscpp std_msgs geometry_msgs dm_common

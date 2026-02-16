@@ -1,0 +1,8 @@
+prefix=/home/jameszhao2004/catkin_ws/workspaces/ws_robot/install
+
+Name: piper_with_gripper_moveit
+Description: Description of piper_with_gripper_moveit
+Version: 0.3.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

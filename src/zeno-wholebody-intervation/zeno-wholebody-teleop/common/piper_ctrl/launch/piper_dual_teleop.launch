@@ -1,0 +1,121 @@
+<launch>
+  <arg name="gravity_mix_mode" default="additive" />
+  <arg name="master_slave_enable" default="true" />
+  <arg name="mit_enable_tor" default="false" />
+  <arg name="mit_enable_pos" default="true" />
+  <arg name="mit_max_torque_abs" default="18.0" />
+  <arg name="mit_torque_scale" default="[0.5, 0.15, 0.6, 0.5, 0.15, 0.6]" />
+  <arg name="mit_torque_scale_left" default="$(arg mit_torque_scale)" />
+  <arg name="mit_torque_scale_right" default="$(arg mit_torque_scale)" />
+  <arg name="mit_torque_feedback_sign" default="[-1.0, -1.0, -1.0, -1.0, -1.0, -1.0]" />
+  <arg name="mit_torque_feedback_sign_left" default="$(arg mit_torque_feedback_sign)" />
+  <arg name="mit_torque_feedback_sign_right" default="$(arg mit_torque_feedback_sign)" />
+  <arg name="enforce_joint_limits" default="true" />
+  <arg name="gripper_haptic_effort_sign" default="0.0" />
+  <arg name="gripper_haptic_effort_deadband" default="0.15" />
+  <arg name="gripper_haptic_effort_max" default="0.6" />
+  <arg name="gripper_haptic_effort_bias" default="0.0" />
+  <arg name="gripper_haptic_cmd_max" default="500" />
+  <arg name="gripper_haptic_cmd_enable_threshold" default="80" />
+  <arg name="gripper_haptic_effort_alpha" default="0.2" />
+  <arg name="gripper_haptic_release_when_opening" default="true" />
+  <arg name="gripper_haptic_opening_relief" default="0.15" />
+  <arg name="gripper_haptic_opening_sign" default="0.0" />
+  <arg name="gripper_haptic_opening_direction_eps" default="0.0001" />
+  <arg name="shutdown_mode" default="hold" />
+  <arg name="shutdown_hold_retries" default="5" />
+  <arg name="shutdown_hold_interval_sec" default="0.05" />
+  <arg name="disable_on_shutdown" default="true" />
+  <arg name="shutdown_disable_retries" default="3" />
+  <arg name="shutdown_disable_interval_sec" default="0.05" />
+  <arg name="left_can_port" default="can_ml" />
+  <arg name="right_can_port" default="can_mr" />
+  <!-- 
+    Piper Dual Teleop Launch
+    
+    Parameter loading order:
+    1. piper_ctrl_mit_gravity.yaml - Control parameters with gravity compensation
+    2. piper_dual.yaml - Node-specific parameters (can_port, topics, gripper)
+    
+    piper_dual.yaml is loaded to root namespace where node name keys 
+    (e.g., piper_teleop_left_node) map to each node's private namespace.
+  -->
+
+  <!-- Load node-specific parameters once to avoid cross-node overwrite races -->
+  <rosparam file="$(find piper_ctrl)/config/piper_dual.yaml" command="load" ns="/"/>
+
+  <!-- Left arm node -->
+  <node name="piper_teleop_left_node" pkg="piper_ctrl" type="piper_ctrl_node.py" output="screen">
+    <!-- Load control parameters (with gravity compensation) to node's private namespace -->
+    <rosparam file="$(find piper_ctrl)/config/piper_ctrl_mit_gravity.yaml" command="load"/>
+    <!-- Runtime safety overrides -->
+    <param name="can_port" value="$(arg left_can_port)" />
+    <param name="mit/gravity_mix_mode" value="$(arg gravity_mix_mode)" />
+    <param name="master_slave/enable" value="$(arg master_slave_enable)" />
+    <param name="mit/enable_tor" value="$(arg mit_enable_tor)" />
+    <param name="mit/enable_pos" value="$(arg mit_enable_pos)" />
+    <param name="mit/max_torque_abs" value="$(arg mit_max_torque_abs)" />
+    <rosparam subst_value="true" param="mit/torque_scale">$(arg mit_torque_scale_left)</rosparam>
+    <rosparam subst_value="true" param="mit/torque_feedback_sign">$(arg mit_torque_feedback_sign_left)</rosparam>
+    <param name="enforce_joint_limits" value="$(arg enforce_joint_limits)" />
+    <param name="gripper_haptic_effort_sign" value="$(arg gripper_haptic_effort_sign)" />
+    <param name="gripper_haptic_effort_deadband" value="$(arg gripper_haptic_effort_deadband)" />
+    <param name="gripper_haptic_effort_max" value="$(arg gripper_haptic_effort_max)" />
+    <param name="gripper_haptic_effort_bias" value="$(arg gripper_haptic_effort_bias)" />
+    <param name="gripper_haptic_cmd_max" value="$(arg gripper_haptic_cmd_max)" />
+    <param name="gripper_haptic_cmd_enable_threshold" value="$(arg gripper_haptic_cmd_enable_threshold)" />
+    <param name="gripper_haptic_effort_alpha" value="$(arg gripper_haptic_effort_alpha)" />
+    <param name="gripper_haptic_release_when_opening" value="$(arg gripper_haptic_release_when_opening)" />
+    <param name="gripper_haptic_opening_relief" value="$(arg gripper_haptic_opening_relief)" />
+    <param name="gripper_haptic_opening_sign" value="$(arg gripper_haptic_opening_sign)" />
+    <param name="gripper_haptic_opening_direction_eps" value="$(arg gripper_haptic_opening_direction_eps)" />
+    <param name="shutdown_mode" value="$(arg shutdown_mode)" />
+    <param name="shutdown_hold_retries" value="$(arg shutdown_hold_retries)" />
+    <param name="shutdown_hold_interval_sec" value="$(arg shutdown_hold_interval_sec)" />
+    <param name="disable_on_shutdown" value="$(arg disable_on_shutdown)" />
+    <param name="shutdown_disable_retries" value="$(arg shutdown_disable_retries)" />
+    <param name="shutdown_disable_interval_sec" value="$(arg shutdown_disable_interval_sec)" />
+  </node>
+  
+  <!-- Right arm node -->
+  <node name="piper_teleop_right_node" pkg="piper_ctrl" type="piper_ctrl_node.py" output="screen">
+    <!-- Load control parameters (with gravity compensation) to node's private namespace -->
+    <rosparam file="$(find piper_ctrl)/config/piper_ctrl_mit_gravity.yaml" command="load"/>
+    <!-- Runtime safety overrides -->
+    <param name="can_port" value="$(arg right_can_port)" />
+    <param name="mit/gravity_mix_mode" value="$(arg gravity_mix_mode)" />
+    <param name="master_slave/enable" value="$(arg master_slave_enable)" />
+    <param name="mit/enable_tor" value="$(arg mit_enable_tor)" />
+    <param name="mit/enable_pos" value="$(arg mit_enable_pos)" />
+    <param name="mit/max_torque_abs" value="$(arg mit_max_torque_abs)" />
+    <rosparam subst_value="true" param="mit/torque_scale">$(arg mit_torque_scale_right)</rosparam>
+    <rosparam subst_value="true" param="mit/torque_feedback_sign">$(arg mit_torque_feedback_sign_right)</rosparam>
+    <param name="enforce_joint_limits" value="$(arg enforce_joint_limits)" />
+    <param name="gripper_haptic_effort_sign" value="$(arg gripper_haptic_effort_sign)" />
+    <param name="gripper_haptic_effort_deadband" value="$(arg gripper_haptic_effort_deadband)" />
+    <param name="gripper_haptic_effort_max" value="$(arg gripper_haptic_effort_max)" />
+    <param name="gripper_haptic_effort_bias" value="$(arg gripper_haptic_effort_bias)" />
+    <param name="gripper_haptic_cmd_max" value="$(arg gripper_haptic_cmd_max)" />
+    <param name="gripper_haptic_cmd_enable_threshold" value="$(arg gripper_haptic_cmd_enable_threshold)" />
+    <param name="gripper_haptic_effort_alpha" value="$(arg gripper_haptic_effort_alpha)" />
+    <param name="gripper_haptic_release_when_opening" value="$(arg gripper_haptic_release_when_opening)" />
+    <param name="gripper_haptic_opening_relief" value="$(arg gripper_haptic_opening_relief)" />
+    <param name="gripper_haptic_opening_sign" value="$(arg gripper_haptic_opening_sign)" />
+    <param name="gripper_haptic_opening_direction_eps" value="$(arg gripper_haptic_opening_direction_eps)" />
+    <param name="shutdown_mode" value="$(arg shutdown_mode)" />
+    <param name="shutdown_hold_retries" value="$(arg shutdown_hold_retries)" />
+    <param name="shutdown_hold_interval_sec" value="$(arg shutdown_hold_interval_sec)" />
+    <param name="disable_on_shutdown" value="$(arg disable_on_shutdown)" />
+    <param name="shutdown_disable_retries" value="$(arg shutdown_disable_retries)" />
+    <param name="shutdown_disable_interval_sec" value="$(arg shutdown_disable_interval_sec)" />
+  </node>
+
+    <!-- end_pose_delta 节点 -->
+    <node name="piper_teleop_left_delta_node" pkg="piper_ctrl" type="end_pose_delta.py" output="screen">
+
+        <!-- 话题前缀（和 piper_ctrl_node 一致） -->
+      <param name="topic_prefix" value="/teleop/arm_left/" />
+    </node>
+
+    
+</launch>

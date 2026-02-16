@@ -1,0 +1,28 @@
+# Teleop tuning profile for gravity-only MIT mode.
+# Loaded at root namespace (ns=/) by start_teleop_tunable.launch.
+
+piper_teleop_left_node:
+  master_slave:
+    enable: false
+  mit:
+    enable_tor: false
+    enable_pos: true
+    max_torque_abs: 8.0
+    gravity_mix_mode: "gravity_only"
+
+piper_teleop_right_node:
+  master_slave:
+    enable: false
+  mit:
+    enable_tor: false
+    enable_pos: true
+    max_torque_abs: 8.0
+    gravity_mix_mode: "gravity_only"
+
+piper_gravity_compensation_node:
+  unwrap_joint_positions: true
+  max_joint_step: 0.08
+  max_torque_delta_warn: 2.0
+
+  gravity_joint_offset_left: [0.0, 0.04, -0.05, 0.0, 0.0, 0.0]
+  gravity_joint_scale_right: [1.0, 0.85, 0.75, 0.8, 1.0, 1.0]

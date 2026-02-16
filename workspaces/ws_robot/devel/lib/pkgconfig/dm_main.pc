@@ -1,0 +1,8 @@
+prefix=/home/jameszhao2004/catkin_ws/workspaces/ws_robot/devel
+
+Name: dm_main
+Description: Description of dm_main
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib -ldm_main
+Requires: dm_hw roscpp

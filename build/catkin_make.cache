@@ -1,0 +1,2 @@
+piper_ros/src/piper:piper_ros/src/piper_description:piper_ros/src/piper_moveit/piper_no_gripper_moveit:piper_ros/src/piper_moveit/piper_with_gripper_moveit:piper_ros/src/piper_msgs:piper_ros/src/piper_noetic:piper_ros/src/piper_sim/piper_gazebo:piper_ros/src/piper_sim/piper_mujoco:piper_teleop:realsense-ros/realsense2_camera:realsense-ros/realsense2_description
+-DCATKIN_DEVEL_PREFIX=/home/jameszhao2004/catkin_ws/devel -DCMAKE_INSTALL_PREFIX=/home/jameszhao2004/catkin_ws/install -G Unix Makefiles

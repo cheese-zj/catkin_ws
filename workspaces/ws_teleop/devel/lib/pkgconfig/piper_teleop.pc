@@ -1,0 +1,8 @@
+prefix=/home/jameszhao2004/catkin_ws/workspaces/ws_teleop/devel
+
+Name: piper_teleop
+Description: Description of piper_teleop
+Version: 0.0.1
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

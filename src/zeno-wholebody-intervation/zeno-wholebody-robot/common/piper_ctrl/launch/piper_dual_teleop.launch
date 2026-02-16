@@ -1,0 +1,44 @@
+<launch>
+  <arg name="gravity_mix_mode" default="additive" />
+  <arg name="master_slave_enable" default="false" />
+  <arg name="mit_enable_tor" default="false" />
+  <arg name="mit_enable_pos" default="true" />
+  <arg name="mit_max_torque_abs" default="18.0" />
+  <!-- 
+    Piper Dual Teleop Launch
+    
+    Parameter loading order:
+    1. piper_ctrl_mit_gravity.yaml - Control parameters with gravity compensation
+    2. piper_dual.yaml - Node-specific parameters (can_port, topics, gripper)
+    
+    piper_dual.yaml is loaded to root namespace where node name keys 
+    (e.g., piper_teleop_left_node) map to each node's private namespace.
+  -->
+
+  <!-- Load node-specific parameters once to avoid cross-node overwrite races -->
+  <rosparam file="$(find piper_ctrl)/config/piper_dual.yaml" command="load" ns="/"/>
+
+  <!-- Left arm node -->
+  <node name="piper_teleop_left_node" pkg="piper_ctrl" type="piper_ctrl_node.py" output="screen">
+    <!-- Load control parameters (with gravity compensation) to node's private namespace -->
+    <rosparam file="$(find piper_ctrl)/config/piper_ctrl_mit_gravity.yaml" command="load"/>
+    <!-- Runtime safety overrides -->
+    <param name="mit/gravity_mix_mode" value="$(arg gravity_mix_mode)" />
+    <param name="master_slave/enable" value="$(arg master_slave_enable)" />
+    <param name="mit/enable_tor" value="$(arg mit_enable_tor)" />
+    <param name="mit/enable_pos" value="$(arg mit_enable_pos)" />
+    <param name="mit/max_torque_abs" value="$(arg mit_max_torque_abs)" />
+  </node>
+  
+  <!-- Right arm node -->
+  <node name="piper_teleop_right_node" pkg="piper_ctrl" type="piper_ctrl_node.py" output="screen">
+    <!-- Load control parameters (with gravity compensation) to node's private namespace -->
+    <rosparam file="$(find piper_ctrl)/config/piper_ctrl_mit_gravity.yaml" command="load"/>
+    <!-- Runtime safety overrides -->
+    <param name="mit/gravity_mix_mode" value="$(arg gravity_mix_mode)" />
+    <param name="master_slave/enable" value="$(arg master_slave_enable)" />
+    <param name="mit/enable_tor" value="$(arg mit_enable_tor)" />
+    <param name="mit/enable_pos" value="$(arg mit_enable_pos)" />
+    <param name="mit/max_torque_abs" value="$(arg mit_max_torque_abs)" />
+  </node>
+</launch>

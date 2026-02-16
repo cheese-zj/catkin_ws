@@ -1,0 +1,25 @@
+<launch>
+  <!-- Minimal runtime args -->
+  <arg name="left_can_port" default="can_ml" />
+  <arg name="right_can_port" default="can_mr" />
+  <arg name="enable_paddle" default="false" />
+  <arg name="enable_dual_arm" default="true" />
+  <arg name="enable_gravity_compensation" default="true" />
+
+  <!-- Tune these parameters in one file instead of long CLI overrides -->
+  <arg
+    name="tuning_profile_file"
+    default="$(find teleop_setup)/config/teleop_tuning_gravity_only.yaml"
+  />
+
+  <include file="$(find teleop_setup)/launch/start_teleop_all.launch">
+    <arg name="left_can_port" value="$(arg left_can_port)" />
+    <arg name="right_can_port" value="$(arg right_can_port)" />
+    <arg name="enable_paddle" value="$(arg enable_paddle)" />
+    <arg name="enable_dual_arm" value="$(arg enable_dual_arm)" />
+    <arg name="enable_gravity_compensation" value="$(arg enable_gravity_compensation)" />
+  </include>
+
+  <!-- Override node params from profile after include expansion -->
+  <rosparam file="$(arg tuning_profile_file)" command="load" ns="/" />
+</launch>
