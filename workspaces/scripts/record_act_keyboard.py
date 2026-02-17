@@ -91,6 +91,12 @@ class Recorder:
         self.camera_health_topics = [entry["image_base"] for entry in self.camera_streams]
         self.camera_info_topics = [entry["camera_info"] for entry in self.camera_streams]
         self.required_presence_topics = self._build_required_presence_topics()
+        self.required_joint_topics = [
+            "/robot/arm_left/joint_states_single",
+            "/robot/arm_right/joint_states_single",
+            "/teleop/arm_left/joint_states_single",
+            "/teleop/arm_right/joint_states_single",
+        ]
         self.profile_record_topics = dedup_keep_order(self.required_topics + self.camera_record_topics)
 
         self.session_root = Path(args.session_root).expanduser().resolve()
@@ -137,8 +143,14 @@ class Recorder:
             "/piper_teleop_right_node/can_port",
             "/piper_teleop_left_node/gripper_reverse",
             "/piper_teleop_right_node/gripper_reverse",
+            "/piper_teleop_left_node/mit/enable_tor",
+            "/piper_teleop_right_node/mit/enable_tor",
             "/piper_teleop_left_node/mit/gravity_mix_mode",
             "/piper_teleop_right_node/mit/gravity_mix_mode",
+            "/piper_teleop_left_node/mit/torque_scale",
+            "/piper_teleop_right_node/mit/torque_scale",
+            "/piper_teleop_left_node/mit/torque_feedback_sign",
+            "/piper_teleop_right_node/mit/torque_feedback_sign",
             "/piper_teleop_left_node/master_slave/enable",
             "/piper_teleop_right_node/master_slave/enable",
         ]
@@ -531,6 +543,7 @@ class Recorder:
         poll_sec = 0.2 if timeout_sec <= 5.0 else 1.0
         last_master_msg = ""
         last_missing_presence: List[str] = []
+        last_joint_no_publisher: List[str] = []
         last_camera_unhealthy: List[str] = []
 
         while time.time() < deadline:
@@ -547,6 +560,16 @@ class Recorder:
                 time.sleep(poll_sec)
                 continue
             last_missing_presence = []
+
+            joint_no_publisher: List[str] = []
+            for topic in self.required_joint_topics:
+                if topic in topics and not self._topic_has_publishers(topic):
+                    joint_no_publisher.append(topic)
+            if joint_no_publisher:
+                last_joint_no_publisher = joint_no_publisher
+                time.sleep(poll_sec)
+                continue
+            last_joint_no_publisher = []
 
             camera_unhealthy: List[str] = []
             if not skip_camera_publishers:
@@ -574,6 +597,7 @@ class Recorder:
                 "wait_sec": round(time.time() - started, 3),
                 "ros_master_msg": master_msg,
                 "required_presence_topics": list(self.required_presence_topics),
+                "required_joint_topics": list(self.required_joint_topics),
                 "camera_health_topics": list(self.camera_health_topics),
                 "skip_camera_publishers": bool(skip_camera_publishers),
                 "optional_present": optional_present,
@@ -584,10 +608,12 @@ class Recorder:
             "reason": "preflight_timeout",
             "wait_timeout_sec": timeout_sec,
             "required_presence_topics": list(self.required_presence_topics),
+            "required_joint_topics": list(self.required_joint_topics),
             "camera_health_topics": list(self.camera_health_topics),
             "skip_camera_publishers": bool(skip_camera_publishers),
             "last_master_msg": last_master_msg,
             "last_missing_presence_topics": last_missing_presence,
+            "last_joint_no_publisher_topics": last_joint_no_publisher,
             "last_camera_unhealthy_topics": last_camera_unhealthy,
         }
 
@@ -869,6 +895,13 @@ class Recorder:
                 if not info or int(info.get("messages", 0)) == 0:
                     warnings.append(f"Compressed stream has zero messages: {compressed_topic}")
 
+        per_topic = bag_stats.get("per_topic", {})
+        for topic in self.required_joint_topics:
+            info = per_topic.get(topic)
+            msg_count = int(info.get("messages", 0)) if isinstance(info, dict) else 0
+            if msg_count <= 0:
+                warnings.append(f"Required joint topic has zero messages: {topic}")
+
         key_rosparams = self._fetch_rosparams()
         step += 1
         self._update_save_job(job_id, step=step, stage="build metadata", status="OK")
@@ -892,6 +925,7 @@ class Recorder:
             },
             "topics": {
                 "profile_required": list(job_data.get("required_topics", [])),
+                "required_joint_topics": list(self.required_joint_topics),
                 "profile_camera_record_topics": list(job_data.get("camera_record_topics", [])),
                 "recorded_topics": list(job_data.get("recorded_topics", [])),
                 "optional_recorded": list(job_data.get("optional_recorded", [])),
@@ -1052,9 +1086,12 @@ class Recorder:
             reason = preflight.get("reason", "preflight_failed")
             print(f"[record] Preflight failed: {reason}")
             missing = list(preflight.get("last_missing_presence_topics", []))
+            no_publisher = list(preflight.get("last_joint_no_publisher_topics", []))
             unhealthy = list(preflight.get("last_camera_unhealthy_topics", []))
             if missing:
                 print(f"[record] preflight missing topics: {missing[:5]}")
+            if no_publisher:
+                print(f"[record] preflight joint topics without publishers: {no_publisher[:5]}")
             if unhealthy:
                 print(f"[record] preflight camera unhealthy: {unhealthy[:5]}")
             return
