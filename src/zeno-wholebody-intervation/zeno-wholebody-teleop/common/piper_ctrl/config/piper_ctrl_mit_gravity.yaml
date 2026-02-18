@@ -24,7 +24,7 @@ mit:
 
   # Proportional gain (lower values for teleop/gravity compensation mode)
   # Can be single value or list of 6 for each joint
-  kp: [0.02, 0.1, 0.1, 0.1, 0.1, 0.1]
+  kp: [0.02, 0.1, 0.15, 0.1, 0.1, 0.1]
 
   # Derivative gain
   # Can be single value or list of 6 for each joint
