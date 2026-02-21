@@ -24,3 +24,9 @@ venv/
 # ROS runtime logs/state
 .ros/
 *.log
+
+
+# Collected Data and Training Checkpoints Output
+
+data/
+outputs/

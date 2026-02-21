@@ -123,6 +123,14 @@ def parse_args() -> argparse.Namespace:
         help="OpenCV fourcc codec used for output mp4 files (default: mp4v).",
     )
     parser.add_argument(
+        "--image-use-bag-time",
+        action="store_true",
+        help=(
+            "Use bag receive time (instead of message header stamp) for image topics. "
+            "Useful when camera header timestamps are invalid or not synchronized."
+        ),
+    )
+    parser.add_argument(
         "--top-camera-topic",
         default="/realsense_top/color/image_raw/compressed",
         help="Overhead camera topic (CompressedImage).",
@@ -156,6 +164,25 @@ def parse_args() -> argparse.Namespace:
         "--teleop-right-topic",
         default="/teleop/arm_right/joint_states_single",
         help="Right teleop command topic (JointState).",
+    )
+    parser.add_argument(
+        "--convert-to-v30",
+        action="store_true",
+        help=(
+            "After writing v2.1 files, run LeRobot's in-place conversion to v3.0 "
+            "(requires lerobot installed in this Python environment)."
+        ),
+    )
+    parser.add_argument(
+        "--v30-push-to-hub",
+        type=lambda x: str(x).lower() == "true",
+        default=False,
+        help="When --convert-to-v30 is set, push converted dataset to Hub (default: false).",
+    )
+    parser.add_argument(
+        "--v30-force-conversion",
+        action="store_true",
+        help="Forward --force-conversion to LeRobot converter (mainly useful for hub-based conversion).",
     )
     return parser.parse_args()
 
@@ -315,6 +342,7 @@ def build_joint_and_image_streams(
     image_topics: Sequence[str],
     image_width: int,
     image_height: int,
+    image_use_bag_time: bool,
     cv2,
     rosbag,
 ) -> Tuple[
@@ -338,8 +366,8 @@ def build_joint_and_image_streams(
     bag = rosbag.Bag(str(bag_path), "r")
     try:
         for topic, msg, t in bag.read_messages(topics=topics):
-            ts = msg_time_sec(msg, t)
             if topic in joint_specs:
+                ts = msg_time_sec(msg, t)
                 spec = joint_specs[topic]
                 pos = list(getattr(msg, "position", []))
                 if len(pos) < spec.pos_dim:
@@ -356,6 +384,7 @@ def build_joint_and_image_streams(
                         continue
                     joint_effort[topic].append(np.asarray(effort[: spec.effort_dim], dtype=np.float32))
             elif topic in image_ts:
+                ts = float(t.to_sec()) if image_use_bag_time else msg_time_sec(msg, t)
                 frame = decode_compressed_image(msg, cv2, image_width, image_height)
                 if frame is None:
                     continue
@@ -428,6 +457,7 @@ def convert_episode(
     topic_right_wrist: str,
     image_width: int,
     image_height: int,
+    image_use_bag_time: bool,
     video_codec: str,
     cv2,
     rosbag,
@@ -462,6 +492,7 @@ def convert_episode(
         image_topics=image_topics,
         image_width=image_width,
         image_height=image_height,
+        image_use_bag_time=image_use_bag_time,
         cv2=cv2,
         rosbag=rosbag,
     )
@@ -772,6 +803,29 @@ def _validate_positive(name: str, value: int) -> None:
         raise RuntimeError(f"{name} must be > 0, got {value}")
 
 
+def convert_local_dataset_v21_to_v30(
+    *,
+    dataset_id: str,
+    output_root: Path,
+    push_to_hub: bool,
+    force_conversion: bool,
+) -> None:
+    try:
+        from lerobot.datasets.v30.convert_dataset_v21_to_v30 import convert_dataset
+    except Exception as exc:
+        raise RuntimeError(
+            "Failed to import LeRobot v2.1->v3.0 converter. Install lerobot in this environment."
+        ) from exc
+
+    print(f"[convert] upgrading dataset to v3.0: {dataset_id}")
+    convert_dataset(
+        repo_id=dataset_id,
+        root=output_root,
+        push_to_hub=push_to_hub,
+        force_conversion=force_conversion,
+    )
+
+
 def main() -> int:
     args = parse_args()
     cv2, rosbag = import_runtime_deps()
@@ -823,6 +877,7 @@ def main() -> int:
                 topic_right_wrist=str(args.right_wrist_topic),
                 image_width=int(args.image_width),
                 image_height=int(args.image_height),
+                image_use_bag_time=bool(args.image_use_bag_time),
                 video_codec=str(args.video_codec),
                 cv2=cv2,
                 rosbag=rosbag,
@@ -857,7 +912,16 @@ def main() -> int:
         video_codec=str(args.video_codec),
     )
 
-    print(f"[convert] done: {len(converted)} episodes -> {dataset_dir}")
+    if bool(args.convert_to_v30):
+        convert_local_dataset_v21_to_v30(
+            dataset_id=str(args.dataset_id),
+            output_root=output_root,
+            push_to_hub=bool(args.v30_push_to_hub),
+            force_conversion=bool(args.v30_force_conversion),
+        )
+
+    output_version = "v3.0" if bool(args.convert_to_v30) else "v2.1"
+    print(f"[convert] done: {len(converted)} episodes -> {dataset_dir} ({output_version})")
     if skip_reasons:
         print("[convert] skip summary:")
         for reason, count in sorted(skip_reasons.items(), key=lambda x: (-x[1], x[0])):

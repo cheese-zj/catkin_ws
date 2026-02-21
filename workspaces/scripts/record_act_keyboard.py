@@ -79,6 +79,8 @@ class Recorder:
     def __init__(self, args: argparse.Namespace) -> None:
         self.args = args
         self.profile = self._load_profile(args.profile)
+        if args.camera_transport != "profile":
+            self.profile["camera_transport"] = args.camera_transport
         self._validate_profile(self.profile)
 
         self.camera_transport = self.profile["camera_transport"]
@@ -217,14 +219,18 @@ class Recorder:
             raise RuntimeError(f"Missing required command(s) in PATH: {', '.join(missing)}")
 
     def _scan_next_episode_index(self) -> int:
-        max_idx = 0
+        used_indices = set()
         for entry in self.session_dir.iterdir():
             if not entry.is_dir():
                 continue
             match = re.match(r"^episode_(\d+)$", entry.name)
             if match:
-                max_idx = max(max_idx, int(match.group(1)))
-        return max_idx + 1
+                used_indices.add(int(match.group(1)))
+
+        idx = 1
+        while idx in used_indices:
+            idx += 1
+        return idx
 
     def _run_cmd(
         self,
@@ -527,6 +533,7 @@ class Recorder:
         print("== ACT Keyboard Recorder ==")
         print(f"Session: {self.session_name}")
         print(f"Session dir: {self.session_dir}")
+        print(f"Camera transport: {self.camera_transport}")
         print(f"Next episode: episode_{self.next_episode_index:03d}")
         print(f"Async save workers: {self.save_workers}")
         print("Keys: SPACE=start/stop, Q=quit")
@@ -618,7 +625,7 @@ class Recorder:
         }
 
     def _get_next_episode_slot(self) -> Tuple[int, str, Path]:
-        idx = self.next_episode_index
+        idx = self._scan_next_episode_index()
         while True:
             name = f"episode_{idx:03d}"
             ep_dir = self.session_dir / name
@@ -1206,7 +1213,7 @@ class Recorder:
         self.last_stop_monotonic = time.monotonic()
         self.last_stop_reason = stop_reason
         self._reset_current_episode_state()
-        self.next_episode_index += 1
+        self.next_episode_index = self._scan_next_episode_index()
 
         print(f"[record] start_utc={start_utc}")
         print(f"[record] stop_utc={ended_utc}")
@@ -1275,6 +1282,12 @@ def parse_args() -> argparse.Namespace:
         "--profile",
         default="/home/jameszhao2004/catkin_ws/workspaces/config/rosbag_profiles/act_rgb_profile.yaml",
         help="Path to YAML topic profile.",
+    )
+    parser.add_argument(
+        "--camera-transport",
+        choices=("profile", "compressed", "raw"),
+        default="profile",
+        help="Override camera transport from profile. Use 'compressed' or 'raw' (default: profile).",
     )
     parser.add_argument(
         "--session-root",

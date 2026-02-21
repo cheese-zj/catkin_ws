@@ -34,6 +34,16 @@ source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_teleop.sh
 
 ## 3) 一次性构建
 
+先安装必需的 ROS 系统包（`dm_hw` 依赖 `serial`）：
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ros-noetic-serial
+```
+
+如果你使用 Docker 别名 `ros1`，请把 `ros-noetic-serial` 加到
+`ros1-piper` 的 Dockerfile 安装列表里，并重新构建镜像。
+
 每个隔离工作空间至少构建一次（或代码更新后重新构建）：
 
 ```bash
@@ -57,7 +67,7 @@ source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
 roslaunch robot_setup start_robot_all.launch \
   left_can_port:=can_sl right_can_port:=can_sr \
   enable_cameras:=true enable_rviz:=true enable_handeye_tf:=true enable_fisheye:=false \
-  camera_left_usb_port:=2-2.3 camera_right_usb_port:=2-2.4 camera_top_usb_port:=2-2.1
+  camera_left_usb_port:=2-2.2.1.4 camera_right_usb_port:=2-2.2.1.2 camera_top_usb_port:=2-2.2.1.3
 
 ```
 
@@ -135,7 +145,7 @@ source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
 roslaunch robot_setup start_robot_all.launch \
   left_can_port:=can_sl right_can_port:=can_sr \
   enable_cameras:=true enable_rviz:=true enable_handeye_tf:=true enable_fisheye:=false \
-  camera_left_usb_port:=2-2.3 camera_right_usb_port:=2-2.4 camera_top_usb_port:=2-2.1
+  camera_left_usb_port:=2-2.2.1.4 camera_right_usb_port:=2-2.2.1.2 camera_top_usb_port:=2-2.2.1.3
 ```
 
 当前配置中的相机行为：
@@ -144,7 +154,7 @@ roslaunch robot_setup start_robot_all.launch \
 - 顶部相机：开启 RGB 色彩流。
 - 关闭 depth/pointcloud。
 - 本实验室端口映射：
-  左手腕 D405 -> `2-2.3`，右手腕 D405 -> `2-2.4`，顶部 D435 -> `2-2.1`。
+  左手腕 D405 -> `2-2.2.1.4`，右手腕 D405 -> `2-2.2.1.2`，顶部 D435 -> `2-2.2.1.3`。
 
 先检查 USB 端口映射：
 
@@ -234,6 +244,12 @@ CAN socket 名称错误：
 - 现象：`Resource not found: v4l2_cam_launch`
 - 处理：保持 `enable_fisheye:=false`（当前 robot launch 默认值）。
 
+缺少 serial 包：
+
+- 现象：`Could not find a package configuration file provided by "serial"`
+- 处理：安装 `ros-noetic-serial` 后重新构建：
+  `sudo apt-get update && sudo apt-get install -y ros-noetic-serial`
+
 RealSense USB 被占用：
 
 - 现象：`RS2_USB_STATUS_BUSY` 或 `failed to set power state`
@@ -258,6 +274,8 @@ RealSense USB 被占用：
 source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
 python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/record_act_keyboard.py
 ```
+
+该命令使用默认话题配置（`workspaces/config/rosbag_profiles/act_rgb_profile.yaml`），适配当前这套相机命名，建议直接使用。
 
 可选参数示例：
 
@@ -480,3 +498,127 @@ rosservice call /robot/arm_right/joint_cmd_mux_select /teleop/arm_right/joint_st
 - `rostopic echo -n 1 /conrft_robot/slave_follow_flag` 无输出
   - 原因：错过 `--once` 的发布窗口
   - 处理：先开持续 `rostopic echo /conrft_robot/slave_follow_flag`，再执行 `set_teleop_mode.sh`
+
+## 12) ACT Checkpoint 在线推理（仅发布，不做切换）
+
+本节新增脚本：
+
+- `workspaces/scripts/run_act_checkpoint_ros.py`
+
+设计约束（重要）：
+
+- 仅发布策略命令到 robot 侧话题：
+  - `/robot/arm_left/vla_joint_cmd`
+  - `/robot/arm_right/vla_joint_cmd`
+- 不调用 `joint_cmd_mux_select` service
+- 不发布 `/conrft_robot/slave_follow_flag`
+- 不切换 teleop/follow 模式
+
+### 12.1 前置条件
+
+1) robot + teleop 栈已经按本 runbook 启动  
+2) 推理环境可用（建议在 ROS1 Docker 内使用 Python>=3.10 的 venv/uv venv）  
+3) 已有 checkpoint 目录（包含 `config.json` 和 `model.safetensors`）
+
+### 12.2 启动策略发布节点
+
+```bash
+source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
+source /home/jameszhao2004/catkin_ws/.venv_train_act/bin/activate
+
+python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/run_act_checkpoint_ros.py \
+  --checkpoint-dir /home/jameszhao2004/catkin_ws/outputs/train/act_20260218_smoke/checkpoints/000200/pretrained_model \
+  --device cuda \
+  --rate 20 \
+  --temporal-ensemble-coeff 0.01 \
+  --guard-profile medium
+```
+
+可选参数：
+
+- `--disable-gripper`：禁用策略对夹爪的控制
+- `--robot-left-topic` / `--robot-right-topic`：覆盖状态输入话题
+- `--top-camera-topic` / `--left-wrist-topic` / `--right-wrist-topic`：覆盖图像输入话题
+- `--out-left-topic` / `--out-right-topic`：覆盖发布目标话题
+
+### 12.3 外部切换流程（由你或其他脚本负责）
+
+策略节点启动后，是否“接管 robot”由外部 mux 切换决定：
+
+切到策略输入：
+
+```bash
+rosservice call /robot/arm_left/joint_cmd_mux_select /robot/arm_left/vla_joint_cmd
+rosservice call /robot/arm_right/joint_cmd_mux_select /robot/arm_right/vla_joint_cmd
+```
+
+切回 teleop 输入：
+
+```bash
+rosservice call /robot/arm_left/joint_cmd_mux_select /teleop/arm_left/joint_states_single
+rosservice call /robot/arm_right/joint_cmd_mux_select /teleop/arm_right/joint_states_single
+```
+
+teleop follow 模式同样由外部控制：
+
+```bash
+bash /home/jameszhao2004/catkin_ws/workspaces/scripts/set_teleop_mode.sh follow
+bash /home/jameszhao2004/catkin_ws/workspaces/scripts/set_teleop_mode.sh teleop
+```
+
+### 12.4 运行期安全行为
+
+节点内置发布侧保护（不改系统模式）：
+
+- `guard-profile=medium` 默认启用（平滑 + 步进限幅 + 夹爪范围约束）
+- 任一输入流缺失/过旧/时间戳不同步时，暂停发布
+- 输入恢复后自动继续发布
+
+即使出现异常，节点也不会自动切 mux、不会自动改 follow 标志。
+
+### 12.5 已验证记录（2026-02-18）与快速排障
+
+**2026-02-18** 实测结论：策略发布链路已可完整跑通。
+
+验证步骤：
+
+1) 启动策略节点并保持运行：
+
+```bash
+source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
+source /home/jameszhao2004/catkin_ws/.venv_train_act/bin/activate
+python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/run_act_checkpoint_ros.py \
+  --checkpoint-dir /home/jameszhao2004/catkin_ws/outputs/train/act_20260218_smoke/checkpoints/000200/pretrained_model \
+  --device cuda \
+  --rate 20 \
+  --temporal-ensemble-coeff 0.01 \
+  --guard-profile medium
+```
+
+2) 检查发布频率：
+
+```bash
+rostopic hz /robot/arm_left/vla_joint_cmd
+rostopic hz /robot/arm_right/vla_joint_cmd
+```
+
+期望：接近 `--rate`（默认 20Hz）。
+
+3) 需要接管 robot 时，手动切 mux：
+
+```bash
+rosservice call /robot/arm_left/joint_cmd_mux_select /robot/arm_left/vla_joint_cmd
+rosservice call /robot/arm_right/joint_cmd_mux_select /robot/arm_right/vla_joint_cmd
+```
+
+本次排障记录（高频）：
+
+- 若 venv 内报 `ModuleNotFoundError: rospkg`：
+  - 在同一 venv 安装一次：
+  - `python -m pip install rospkg catkin_pkg`
+- 若节点启动后“没有继续打印日志”：
+  - 健康状态下这是正常现象（无等待/错误日志）
+  - 用 `rostopic hz /robot/arm_*/vla_joint_cmd` 判断是否在持续发布
+- 若卡在等待输入：
+  - 用 `--debug-streams`
+  - 看 `raw/valid/drop` 计数，快速区分订阅问题、图像解码问题、维度过滤问题。
