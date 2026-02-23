@@ -19,12 +19,26 @@ __pycache__/
 
 # Virtual environments
 .venv/
+.venv*/
 venv/
 
 # ROS runtime logs/state
 .ros/
 *.log
 
+# Python tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Local editor settings
+.vscode/
+.idea/
+
+# Local ML/dataset caches
+.hf_cache/
+.cache/
 
 # Collected Data and Training Checkpoints Output
 

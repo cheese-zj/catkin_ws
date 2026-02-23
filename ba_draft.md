@@ -48,20 +48,21 @@ roslaunch teleop_setup start_teleop_all.launch \
   gripper_haptic_opening_direction_eps:=0.00002
 
 
-python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/unpack_bag_videos.py --bag /home/jameszhao2004/catkin_ws/data/rosbags/act_20260220_220456/episode_007/episode.bag --output-dir /home/jameszhao2004/catkin_ws/data/rosbags/act_20260220_220456/episode_007/episode_videos_mp4  --codec mp4v   --container mp4
+## videos in rosbag -> mp4
+python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/unpack_bag_videos.py --bag /home/jameszhao2004/catkin_ws/data/rosbags/act_20260222_210318/episode_003/episode.bag --output-dir /home/jameszhao2004/catkin_ws/data/rosbags/act_20260222_210318/episode_003/episode_videos_mp4  --codec mp4v   --container mp4
 
 
-
+## train
 source /home/jameszhao2004/catkin_ws/.venv_train_act/bin/activate
 
-DATASET_ID=act_20260218_192753_v21_fps30
-DATASET_ROOT=/home/jameszhao2004/catkin_ws/data/lerobot/${DATASET_ID}
-OUT_ROOT=/home/jameszhao2004/catkin_ws/outputs/train
-RUN_NAME=act_20260218_192753_chunk60_obs1_100k_bs4_amp
+DATASET_ID=act_20260222_210318_v21_fps30
+DATASET_PARENT=/home/jameszhao2004/training_codebase/data/lerobot
+RUN_NAME=act_20260222_210318_chunk100_obs1_100k_bs8_amp
+OUT_DIR=/home/jameszhao2004/training_codebase/outputs/train/${RUN_NAME}
 
 CUDA_VISIBLE_DEVICES=0 lerobot-train \
   --dataset.repo_id ${DATASET_ID} \
-  --dataset.root ${DATASET_ROOT} \
+  --dataset.root ${DATASET_PARENT}/${DATASET_ID} \
   --dataset.video_backend torchcodec \
   --policy.type act \
   --policy.device cuda \
@@ -69,15 +70,17 @@ CUDA_VISIBLE_DEVICES=0 lerobot-train \
   --policy.push_to_hub false \
   --policy.use_amp true \
   --policy.n_obs_steps 1 \
-  --policy.chunk_size 60 \
-  --policy.n_action_steps 60 \
+  --policy.chunk_size 100 \
+  --policy.n_action_steps 100 \
   --steps 100000 \
-  --save_freq 2000 \
+  --save_freq 10000 \
   --log_freq 100 \
-  --batch_size 4 \
+  --batch_size 8 \
   --num_workers 4 \
   --wandb.mode disabled \
-  --output_dir ${OUT_ROOT}/${RUN_NAME}
+  --output_dir ${OUT_DIR} \
+  --resume true
+
 
 
 # run policy:
@@ -88,7 +91,7 @@ python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/run_act_checkpoint_ros.
   --device cuda \
   --rate 30 \
   --temporal-ensemble-coeff 0.002 \
-  --guard-profile aggressive \
+  --guard-profile medium \
   --debug-streams
 
 
@@ -143,3 +146,18 @@ wrist_cam_r = 2-2.2.1.2
 wrist_cam_l = 2-2.2.1.4
 overhead_cam = 2-2.2.1.3
 face_cam = 1-2.1
+
+
+# load policy
+
+OUT_ROOT=/home/jameszhao2004/catkin_ws/outputs/train
+RUN_NAME=act_20260222_210318_chunk100_obs1_100k_bs8_amp_ft
+CKPT_STEP=050000
+
+python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/run_act_checkpoint_ros.py \
+  --checkpoint-dir ${OUT_ROOT}/${RUN_NAME}/checkpoints/${CKPT_STEP}/pretrained_model/ \
+  --device cuda \
+  --rate 30 \
+  --temporal-ensemble-coeff 0.002 \
+  --guard-profile medium \
+  --debug-streams

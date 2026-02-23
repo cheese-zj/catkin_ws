@@ -116,3 +116,21 @@ Default behavior (no extra args):
 - profile: `workspaces/config/rosbag_profiles/act_rgb_profile.yaml`
 - camera topics: `/realsense_left`, `/realsense_right`, `/realsense_top`
 - keyboard: `SPACE` start/stop episode, `Q` safe quit
+
+## convert rosbag to lerobot
+```bash
+source /opt/ros/noetic/setup.bash
+cd /home/jameszhao2004/training_codebase
+
+pipeline/scripts/convert_session.sh \
+  --session-dir /home/jameszhao2004/catkin_ws/data/rosbags/act_20260222_210318 \
+  --dataset-id act_20260222_210318_v21_fps30 \
+  --fps 30 \
+  --min-frames 32 \
+  --task "bimanual teleop"
+```
+
+
+## run policy
+```bash
+```
