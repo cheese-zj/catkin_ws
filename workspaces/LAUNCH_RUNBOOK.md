@@ -34,6 +34,16 @@ source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_teleop.sh
 
 ## 3) One-Time Build
 
+Install required ROS system package first (`dm_hw` depends on `serial`):
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ros-noetic-serial
+```
+
+If you use Docker alias `ros1`, add `ros-noetic-serial` to the `ros1-piper`
+Dockerfile package list and rebuild the image.
+
 Build each isolated workspace once (or after code changes):
 
 ```bash
@@ -89,7 +99,7 @@ source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
 roslaunch robot_setup start_robot_all.launch \
   left_can_port:=can_sl right_can_port:=can_sr \
   enable_cameras:=true enable_rviz:=true enable_handeye_tf:=true enable_fisheye:=false \
-  camera_left_usb_port:=2-2.3 camera_right_usb_port:=2-2.4 camera_top_usb_port:=2-2.1
+  camera_left_usb_port:=2-2.2.1.4 camera_right_usb_port:=2-2.2.1.2 camera_top_usb_port:=2-2.2.1.3
 ```
 
 Camera behavior in current config:
@@ -98,7 +108,7 @@ Camera behavior in current config:
 - Top camera: RGB color stream enabled.
 - Depth/pointcloud disabled.
 - Lab port mapping:
-  left wrist D405 -> `2-2.3`, right wrist D405 -> `2-2.4`, top D435 -> `2-2.1`.
+  left wrist D405 -> `2-2.2.1.4`, right wrist D405 -> `2-2.2.1.2`, top D435 -> `2-2.2.1.3`.
 
 Check USB port mapping first:
 
@@ -168,6 +178,12 @@ Missing fisheye package:
 - Symptom: `Resource not found: v4l2_cam_launch`
 - Fix: keep `enable_fisheye:=false` (default in current robot launch).
 
+Missing serial package:
+
+- Symptom: `Could not find a package configuration file provided by "serial"`
+- Fix: install `ros-noetic-serial`, then rebuild:
+  `sudo apt-get update && sudo apt-get install -y ros-noetic-serial`
+
 RealSense USB busy:
 
 - Symptom: `RS2_USB_STATUS_BUSY` or `failed to set power state`
@@ -192,6 +208,8 @@ After launching robot + teleop (Section 4), open a third terminal and run:
 source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
 python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/record_act_keyboard.py
 ```
+
+This uses the default profile (`workspaces/config/rosbag_profiles/act_rgb_profile.yaml`) and is the recommended command for this setup.
 
 Optional example:
 
@@ -250,3 +268,127 @@ Notes:
 - ACT profile records RGB from 3 cameras + dual-arm joint/gripper/pose + core context topics.
 - `/tf` and `/tf_static` are excluded.
 - paddle-related topics are excluded (not used in this lab).
+
+## 11) ACT Checkpoint Online Inference (Publish-Only)
+
+New script:
+
+- `workspaces/scripts/run_act_checkpoint_ros.py`
+
+Design constraints (important):
+
+- Publish policy commands only to robot-side topics:
+  - `/robot/arm_left/vla_joint_cmd`
+  - `/robot/arm_right/vla_joint_cmd`
+- No `joint_cmd_mux_select` service calls
+- No `/conrft_robot/slave_follow_flag` publishing
+- No teleop/follow mode switching
+
+### 11.1 Preconditions
+
+1. Robot + teleop stacks are already running.
+2. Inference environment is available (recommended: Python>=3.10 venv/uv venv inside ROS1 Docker).
+3. Checkpoint directory exists and contains `config.json` and `model.safetensors`.
+
+### 11.2 Start the policy publisher
+
+```bash
+source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
+source /home/jameszhao2004/catkin_ws/.venv_train_act/bin/activate
+
+python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/run_act_checkpoint_ros.py \
+  --checkpoint-dir /home/jameszhao2004/catkin_ws/outputs/train/act_20260218_smoke/checkpoints/000200/pretrained_model \
+  --device cuda \
+  --rate 20 \
+  --temporal-ensemble-coeff 0.01 \
+  --guard-profile medium
+```
+
+Optional flags:
+
+- `--disable-gripper`: disable policy gripper control
+- `--robot-left-topic` / `--robot-right-topic`: override state input topics
+- `--top-camera-topic` / `--left-wrist-topic` / `--right-wrist-topic`: override image input topics
+- `--out-left-topic` / `--out-right-topic`: override publish target topics
+
+### 11.3 External switching flow (owned outside this node)
+
+After the publisher starts, robot takeover is decided by external mux switching:
+
+Switch robot input to policy:
+
+```bash
+rosservice call /robot/arm_left/joint_cmd_mux_select /robot/arm_left/vla_joint_cmd
+rosservice call /robot/arm_right/joint_cmd_mux_select /robot/arm_right/vla_joint_cmd
+```
+
+Switch robot input back to teleop:
+
+```bash
+rosservice call /robot/arm_left/joint_cmd_mux_select /teleop/arm_left/joint_states_single
+rosservice call /robot/arm_right/joint_cmd_mux_select /teleop/arm_right/joint_states_single
+```
+
+Teleop follow mode is also external:
+
+```bash
+bash /home/jameszhao2004/catkin_ws/workspaces/scripts/set_teleop_mode.sh follow
+bash /home/jameszhao2004/catkin_ws/workspaces/scripts/set_teleop_mode.sh teleop
+```
+
+### 11.4 Runtime safety behavior
+
+The node has publish-side guards only (no mode changes):
+
+- `guard-profile=medium` by default (smoothing + per-step clamp + gripper clamp)
+- If any input stream is missing/stale/desynced, publishing is paused
+- Publishing resumes automatically when streams recover
+
+Even under errors, the node does not modify mux selection or follow flags.
+
+### 11.5 Verified Log (2026-02-18) and quick troubleshooting
+
+Status on **February 18, 2026**: end-to-end policy publisher pipeline is confirmed runnable.
+
+Verification checklist:
+
+1. Start policy node and keep it running:
+
+```bash
+source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
+source /home/jameszhao2004/catkin_ws/.venv_train_act/bin/activate
+python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/run_act_checkpoint_ros.py \
+  --checkpoint-dir /home/jameszhao2004/catkin_ws/outputs/train/act_20260218_smoke/checkpoints/000200/pretrained_model \
+  --device cuda \
+  --rate 20 \
+  --temporal-ensemble-coeff 0.01 \
+  --guard-profile medium
+```
+
+2. Check publisher output rate:
+
+```bash
+rostopic hz /robot/arm_left/vla_joint_cmd
+rostopic hz /robot/arm_right/vla_joint_cmd
+```
+
+Expected: close to configured `--rate` (default 20 Hz).
+
+3. Manually switch mux only when you want robot takeover:
+
+```bash
+rosservice call /robot/arm_left/joint_cmd_mux_select /robot/arm_left/vla_joint_cmd
+rosservice call /robot/arm_right/joint_cmd_mux_select /robot/arm_right/vla_joint_cmd
+```
+
+Observed pitfalls and fixes:
+
+- If error shows `ModuleNotFoundError: rospkg` in venv:
+  - install once in the same venv:
+  - `python -m pip install rospkg catkin_pkg`
+- If node starts and appears "quiet":
+  - this can be normal in healthy state (no waiting/error logs after startup)
+  - validate with `rostopic hz /robot/arm_*/vla_joint_cmd`
+- If waiting for streams, use debug mode:
+  - `--debug-streams`
+  - inspect `raw/valid/drop` counters to separate subscription vs decode vs dimension issues.

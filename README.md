@@ -172,6 +172,7 @@ RUN apt-get update && apt-get install -y \
     ethtool \
     git \
     python3-pip \
+    ros-noetic-serial \
     ros-noetic-realsense2-camera \
     && rm -rf /var/lib/apt/lists/*
 
@@ -665,6 +666,9 @@ Or rebuild Docker image with these in Dockerfile.
 ```bash
 alias ros1='rocker ... -- ros1-piper'  # NOT osrf/ros:noetic-desktop-full
 ```
+
+Also ensure your `ros1-piper` image includes ROS package `ros-noetic-serial`
+for `dm_hw` build dependency.
 
 ---
 

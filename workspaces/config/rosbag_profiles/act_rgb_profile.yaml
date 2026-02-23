@@ -1,6 +1,11 @@
 profile_name: act_rgb
 camera_transport: compressed
 
+# Camera naming contract for this setup:
+# - /realsense_left  => left wrist camera
+# - /realsense_right => right wrist camera
+# - /realsense_top   => overhead camera
+
 required_topics:
   - /robot/arm_left/joint_states_single
   - /robot/arm_right/joint_states_single

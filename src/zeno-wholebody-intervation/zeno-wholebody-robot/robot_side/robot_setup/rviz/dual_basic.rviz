@@ -1,31 +1,4 @@
-Panels:
-  - Class: rviz/Displays
-    Help Height: 85
-    Name: Displays
-    Property Tree Widget:
-      Expanded:
-        - /Global Options1
-        - /Status1
-      Splitter Ratio: 0.34805890917778015
-    Tree Height: 544
-  - Class: rviz/Selection
-    Name: Selection
-  - Class: rviz/Tool Properties
-    Expanded:
-      - /2D Pose Estimate1
-      - /2D Nav Goal1
-      - /Publish Point1
-    Name: Tool Properties
-    Splitter Ratio: 0.5886790156364441
-  - Class: rviz/Views
-    Expanded:
-      - /Current View1
-    Name: Views
-    Splitter Ratio: 0.5
-  - Class: rviz/Time
-    Name: Time
-    SyncMode: 0
-    SyncSource: Image_left
+Panels: []
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -33,31 +6,13 @@ Toolbars:
 Visualization Manager:
   Class: ""
   Displays:
-    - Alpha: 0.5
-      Cell Size: 1
-      Class: rviz/Grid
-      Color: 160; 160; 164
-      Enabled: true
-      Line Style:
-        Line Width: 0.029999999329447746
-        Value: Lines
-      Name: Grid
-      Normal Cell Count: 0
-      Offset:
-        X: 0
-        Y: 0
-        Z: 0
-      Plane: XY
-      Plane Cell Count: 10
-      Reference Frame: <Fixed Frame>
-      Value: true
     - Class: rviz/Image
       Enabled: true
       Image Topic: /realsense_left/color/image_raw
       Max Value: 1
       Median window: 5
       Min Value: 0
-      Name: Image_left
+      Name: Wrist_Left
       Normalize Range: true
       Queue Size: 2
       Transport Hint: compressed
@@ -69,7 +24,7 @@ Visualization Manager:
       Max Value: 1
       Median window: 5
       Min Value: 0
-      Name: Image_right
+      Name: Wrist_Right
       Normalize Range: true
       Queue Size: 2
       Transport Hint: compressed
@@ -81,7 +36,7 @@ Visualization Manager:
       Max Value: 1
       Median window: 5
       Min Value: 0
-      Name: Image_top
+      Name: Overhead
       Normalize Range: true
       Queue Size: 2
       Transport Hint: compressed
@@ -136,24 +91,14 @@ Visualization Manager:
       Yaw: 3.0353970527648926
     Saved: ~
 Window Geometry:
-  Displays:
-    collapsed: false
   Height: 1376
-  Hide Left Dock: false
-  Hide Right Dock: false
-  Image_left:
+  Hide Left Dock: true
+  Hide Right Dock: true
+  Wrist_Left:
     collapsed: false
-  Image_right:
+  Wrist_Right:
     collapsed: false
-  Image_top:
-    collapsed: false
-  Selection:
-    collapsed: false
-  Time:
-    collapsed: false
-  Tool Properties:
-    collapsed: false
-  Views:
+  Overhead:
     collapsed: false
   Width: 2488
   X: 72

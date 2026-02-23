@@ -42,7 +42,14 @@ or
 source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_teleop.sh
 ```
 
-Build once per workspace:
+Required system ROS dependency (`dm_hw`):
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ros-noetic-serial
+```
+
+Then build once per workspace:
 
 ```bash
 /home/jameszhao2004/catkin_ws/workspaces/scripts/build_robot_ws.sh
