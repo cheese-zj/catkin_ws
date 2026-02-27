@@ -1269,9 +1269,14 @@ class C_PiperCtrlNode:
         rospy.loginfo("piper go zero.")
         rospy.loginfo("-----------------------GOZERO---------------------------")
         if req.is_mit_mode:
-            self.piper.MotionCtrl_2(0x01, 0x01, 50, 0xAD)
+            go_zero_speed = int(rospy.get_param("~mit/speed", self.mit_speed))
         else:
-            self.piper.MotionCtrl_2(0x01, 0x01, 50, 0)
+            go_zero_speed = int(rospy.get_param("~p/speed", self.p_speed))
+        go_zero_speed = max(0, min(100, go_zero_speed))
+        if req.is_mit_mode:
+            self.piper.MotionCtrl_2(0x01, 0x01, go_zero_speed, 0xAD)
+        else:
+            self.piper.MotionCtrl_2(0x01, 0x01, go_zero_speed, 0)
         self.piper.JointCtrl(0, 0, 0, 0, 0, 0)
         response.status = True
         response.code = 151001

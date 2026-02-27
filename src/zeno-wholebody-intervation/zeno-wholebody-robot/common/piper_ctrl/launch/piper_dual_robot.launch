@@ -1,4 +1,5 @@
 <launch>
+  <arg name="enforce_joint_limits" default="true" />
   <!-- 
     Piper Dual Robot Launch
     
@@ -16,6 +17,7 @@
     <rosparam file="$(find piper_ctrl)/config/piper_ctrl_mit.yaml" command="load"/>
     <!-- Load node-specific parameters (piper_ctrl_left_node key maps to this node) -->
     <rosparam file="$(find piper_ctrl)/config/piper_dual.yaml" command="load" ns="/"/>
+    <param name="enforce_joint_limits" value="$(arg enforce_joint_limits)" />
   </node>
 
     <node pkg="topic_tools" type="mux" name="mux_arm_left_joint"
@@ -33,6 +35,7 @@
     <rosparam file="$(find piper_ctrl)/config/piper_ctrl_mit.yaml" command="load"/>
     <!-- Load node-specific parameters (piper_ctrl_right_node key maps to this node) -->
     <rosparam file="$(find piper_ctrl)/config/piper_dual.yaml" command="load" ns="/"/>
+    <param name="enforce_joint_limits" value="$(arg enforce_joint_limits)" />
   </node>
 <!-- 这个是可以选择joint话题，即用什么 -->
     <node pkg="topic_tools" type="mux" name="mux_arm_right_joint"

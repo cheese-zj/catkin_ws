@@ -288,7 +288,9 @@ Design constraints (important):
 
 1. Robot + teleop stacks are already running.
 2. Inference environment is available (recommended: Python>=3.10 venv/uv venv inside ROS1 Docker).
-3. Checkpoint directory exists and contains `config.json` and `model.safetensors`.
+3. Since **February 23, 2026**, training and canonical policy storage are owned by `/home/jameszhao2004/training_codebase`.
+4. Sync policy aliases before loading checkpoint shortcuts:
+   `bash /home/jameszhao2004/training_codebase/pipeline/scripts/trainctl.sh policy-sync`
 
 ### 11.2 Start the policy publisher
 
@@ -297,7 +299,7 @@ source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
 source /home/jameszhao2004/catkin_ws/.venv_train_act/bin/activate
 
 python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/run_act_checkpoint_ros.py \
-  --checkpoint-dir /home/jameszhao2004/catkin_ws/outputs/train/act_20260218_smoke/checkpoints/000200/pretrained_model \
+  --checkpoint-dir /home/jameszhao2004/catkin_ws/policies/by_run/<run_name>/best \
   --device cuda \
   --rate 20 \
   --temporal-ensemble-coeff 0.01 \
@@ -332,6 +334,7 @@ rosservice call /robot/arm_right/joint_cmd_mux_select /teleop/arm_right/joint_st
 Teleop follow mode is also external:
 
 ```bash
+source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_teleop.sh
 bash /home/jameszhao2004/catkin_ws/workspaces/scripts/set_teleop_mode.sh follow
 bash /home/jameszhao2004/catkin_ws/workspaces/scripts/set_teleop_mode.sh teleop
 ```
@@ -358,7 +361,7 @@ Verification checklist:
 source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
 source /home/jameszhao2004/catkin_ws/.venv_train_act/bin/activate
 python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/run_act_checkpoint_ros.py \
-  --checkpoint-dir /home/jameszhao2004/catkin_ws/outputs/train/act_20260218_smoke/checkpoints/000200/pretrained_model \
+  --checkpoint-dir /home/jameszhao2004/catkin_ws/policies/by_run/<run_name>/best \
   --device cuda \
   --rate 20 \
   --temporal-ensemble-coeff 0.01 \

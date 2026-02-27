@@ -9,6 +9,7 @@ from std_srvs.srv import SetBool, SetBoolResponse
 import time
 import threading
 import math
+import xml.etree.ElementTree as ET
 import numpy as np
 from piper_sdk import *
 from piper_sdk import C_PiperInterface
@@ -133,6 +134,23 @@ class C_PiperCtrlNode:
         if self.mit_max_torque_abs <= 0.0:
             rospy.logwarn("~mit/max_torque_abs must be > 0. Fallback to 18.0")
             self.mit_max_torque_abs = 18.0
+
+        # Enforce position references inside URDF joint limits to prevent runaways.
+        self.enforce_joint_limits = bool(rospy.get_param("~enforce_joint_limits", True))
+        self.joint_limit_log_epsilon = float(rospy.get_param("~joint_limit_log_epsilon", 1e-6))
+        (
+            self.joint_pos_lower_limits,
+            self.joint_pos_upper_limits,
+            self.joint_limits_source,
+        ) = self._load_joint_position_limits()
+        rospy.loginfo(
+            "Joint position limit enforcement: %s (source=%s)",
+            self.enforce_joint_limits,
+            self.joint_limits_source,
+        )
+        rospy.loginfo("Joint lower limits (rad): %s", [round(v, 4) for v in self.joint_pos_lower_limits])
+        rospy.loginfo("Joint upper limits (rad): %s", [round(v, 4) for v in self.joint_pos_upper_limits])
+
         rospy.loginfo("MIT control parameters: speed=%d", self.mit_speed)
         rospy.loginfo("MIT kp: %s", self.mit_kp)
         rospy.loginfo("MIT kd: %s", self.mit_kd)
@@ -367,6 +385,92 @@ class C_PiperCtrlNode:
     def GetEnableFlag(self):
         return self.__enable_flag
 
+    def _load_joint_position_limits(self):
+        """Load 6-DOF joint limits from params, then robot_description, else fallback."""
+        fallback_lower = [-2.618, 0.0, -2.9671, -1.57, -1.57, -3.14]
+        fallback_upper = [2.618, 3.14, 0.0, 1.57, 1.57, 3.14]
+
+        def parse_limit_list(raw_value, param_name):
+            if raw_value is None:
+                return None
+            if not isinstance(raw_value, list) or len(raw_value) != 6:
+                rospy.logwarn("%s must be a list of 6 values. Got: %s", param_name, str(raw_value))
+                return None
+            try:
+                return [float(v) for v in raw_value]
+            except Exception:
+                rospy.logwarn("%s contains non-numeric values: %s", param_name, str(raw_value))
+                return None
+
+        lower_from_param = parse_limit_list(rospy.get_param("~joint_pos_lower_limits", None), "~joint_pos_lower_limits")
+        upper_from_param = parse_limit_list(rospy.get_param("~joint_pos_upper_limits", None), "~joint_pos_upper_limits")
+        if lower_from_param is not None and upper_from_param is not None:
+            return lower_from_param, upper_from_param, "node_params"
+        if lower_from_param is not None or upper_from_param is not None:
+            rospy.logwarn("Ignoring partial joint limit params. Both lower+upper must be provided.")
+
+        joint_names = ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"]
+        urdf_xml = None
+        if rospy.has_param("/robot_description"):
+            urdf_xml = rospy.get_param("/robot_description")
+        elif rospy.has_param("robot_description"):
+            urdf_xml = rospy.get_param("robot_description")
+
+        if urdf_xml:
+            try:
+                root = ET.fromstring(urdf_xml)
+                joint_map = {j.get("name"): j for j in root.findall("joint")}
+                lower = []
+                upper = []
+                for joint_name in joint_names:
+                    joint_elem = joint_map.get(joint_name)
+                    if joint_elem is None:
+                        raise ValueError(f"joint '{joint_name}' not found in robot_description")
+                    limit_elem = joint_elem.find("limit")
+                    if limit_elem is None:
+                        raise ValueError(f"joint '{joint_name}' has no <limit>")
+                    lo = limit_elem.get("lower")
+                    hi = limit_elem.get("upper")
+                    if lo is None or hi is None:
+                        raise ValueError(f"joint '{joint_name}' missing lower/upper limits")
+                    lower.append(float(lo))
+                    upper.append(float(hi))
+                return lower, upper, "robot_description"
+            except Exception as exc:
+                rospy.logwarn("Failed to parse joint limits from robot_description: %s", str(exc))
+
+        return fallback_lower, fallback_upper, "fallback_defaults"
+
+    def _clamp_joint_positions(self, positions, mode_label):
+        """Clamp 6-DOF position refs to configured joint limits."""
+        if not self.enforce_joint_limits:
+            return positions
+
+        clamped = list(positions)
+        clipped_indices = []
+        for i in range(6):
+            raw = float(clamped[i])
+            lo = float(self.joint_pos_lower_limits[i])
+            hi = float(self.joint_pos_upper_limits[i])
+            clipped = max(lo, min(hi, raw))
+            clamped[i] = clipped
+            if abs(raw - clipped) > self.joint_limit_log_epsilon:
+                clipped_indices.append(i)
+
+        if clipped_indices:
+            max_idx = max(clipped_indices, key=lambda j: abs(float(positions[j]) - float(clamped[j])))
+            rospy.logwarn_throttle(
+                0.5,
+                "Joint pos ref clamped (%s) on joint%d: raw=%.3f clipped=%.3f lim=[%.3f, %.3f]",
+                mode_label,
+                max_idx + 1,
+                float(positions[max_idx]),
+                float(clamped[max_idx]),
+                float(self.joint_pos_lower_limits[max_idx]),
+                float(self.joint_pos_upper_limits[max_idx]),
+            )
+        return clamped
+
     # Callback functions
     def joint_pos_cmd_callback(self, msg: JointState):
         """Position command callback"""
@@ -449,8 +553,7 @@ class C_PiperCtrlNode:
             has_gripper = len(self.joint_positions_cmd) >= 7
             gripper_pos = self.joint_positions_cmd[6] if has_gripper else 0.0
 
-        for i in range(6):
-            positions[i] = max(-12.5, min(12.5, positions[i]))
+        positions = self._clamp_joint_positions(positions, "p")
 
         factor = 1000 * 180 / np.pi
         joint_0 = round(positions[0] * factor)
@@ -488,9 +591,11 @@ class C_PiperCtrlNode:
 
     def _mit_control(self):
         """MIT control implementation"""
+        position_ref_source = "current"
         with self.control_data_lock:
             if self.mit_enable_pos:
                 positions = self.joint_positions_cmd[:]
+                position_ref_source = "cmd"
             else:
                 positions = self.current_joint_positions[:]
 
@@ -521,8 +626,12 @@ class C_PiperCtrlNode:
                 torques[i] = torques[i] * self.mit_torque_scale[i]
 
         torques_pre_clamp = torques[:]
+        # Only clamp external references. When using current joint state as ref
+        # (mit_enable_pos:=false), clamping can create artificial position error
+        # near model limits and feel like unexpected stiffness.
+        if position_ref_source != "current":
+            positions = self._clamp_joint_positions(positions, "mit/" + position_ref_source)
         for i in range(6):
-            positions[i] = max(-12.5, min(12.5, positions[i]))
             velocities[i] = max(-45.0, min(45.0, velocities[i]))
             torques[i] = max(-self.mit_max_torque_abs, min(self.mit_max_torque_abs, torques[i]))
 
@@ -867,9 +976,14 @@ class C_PiperCtrlNode:
         rospy.loginfo("piper go zero.")
         rospy.loginfo("-----------------------GOZERO---------------------------")
         if req.is_mit_mode:
-            self.piper.MotionCtrl_2(0x01, 0x01, 50, 0xAD)
+            go_zero_speed = int(rospy.get_param("~mit/speed", self.mit_speed))
         else:
-            self.piper.MotionCtrl_2(0x01, 0x01, 50, 0)
+            go_zero_speed = int(rospy.get_param("~p/speed", self.p_speed))
+        go_zero_speed = max(0, min(100, go_zero_speed))
+        if req.is_mit_mode:
+            self.piper.MotionCtrl_2(0x01, 0x01, go_zero_speed, 0xAD)
+        else:
+            self.piper.MotionCtrl_2(0x01, 0x01, go_zero_speed, 0)
         self.piper.JointCtrl(0, 0, 0, 0, 0, 0)
         response.status = True
         response.code = 151001

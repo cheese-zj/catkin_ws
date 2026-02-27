@@ -418,6 +418,7 @@ rosservice call /robot/arm_right/joint_cmd_mux_select /teleop/arm_right/joint_st
 设置 teleop 为自由模式：
 
 ```bash
+source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_teleop.sh
 bash /home/jameszhao2004/catkin_ws/workspaces/scripts/set_teleop_mode.sh teleop
 ```
 
@@ -459,6 +460,7 @@ rostopic echo /robot/arm_left/joint_cmd_mux
 在演示 B 基础上，设置 teleop follow：
 
 ```bash
+source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_teleop.sh
 bash /home/jameszhao2004/catkin_ws/workspaces/scripts/set_teleop_mode.sh follow
 rostopic echo -n 1 /conrft_robot/slave_follow_flag
 ```
@@ -475,6 +477,7 @@ rostopic echo -n 1 /conrft_robot/slave_follow_flag
 2) 切 teleop 为自由模式：
 
 ```bash
+source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_teleop.sh
 bash /home/jameszhao2004/catkin_ws/workspaces/scripts/set_teleop_mode.sh teleop
 ```
 
@@ -518,7 +521,9 @@ rosservice call /robot/arm_right/joint_cmd_mux_select /teleop/arm_right/joint_st
 
 1) robot + teleop 栈已经按本 runbook 启动  
 2) 推理环境可用（建议在 ROS1 Docker 内使用 Python>=3.10 的 venv/uv venv）  
-3) 已有 checkpoint 目录（包含 `config.json` 和 `model.safetensors`）
+3) 自 **2026-02-23** 起，训练与策略产物的权威目录在 `/home/jameszhao2004/training_codebase`  
+4) 使用 checkpoint 快捷 alias 前先同步：
+   `bash /home/jameszhao2004/training_codebase/pipeline/scripts/trainctl.sh policy-sync`
 
 ### 12.2 启动策略发布节点
 
@@ -527,7 +532,7 @@ source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
 source /home/jameszhao2004/catkin_ws/.venv_train_act/bin/activate
 
 python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/run_act_checkpoint_ros.py \
-  --checkpoint-dir /home/jameszhao2004/catkin_ws/outputs/train/act_20260218_smoke/checkpoints/000200/pretrained_model \
+  --checkpoint-dir /home/jameszhao2004/catkin_ws/policies/by_run/<run_name>/best \
   --device cuda \
   --rate 20 \
   --temporal-ensemble-coeff 0.01 \
@@ -562,6 +567,7 @@ rosservice call /robot/arm_right/joint_cmd_mux_select /teleop/arm_right/joint_st
 teleop follow 模式同样由外部控制：
 
 ```bash
+source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_teleop.sh
 bash /home/jameszhao2004/catkin_ws/workspaces/scripts/set_teleop_mode.sh follow
 bash /home/jameszhao2004/catkin_ws/workspaces/scripts/set_teleop_mode.sh teleop
 ```
@@ -588,7 +594,7 @@ bash /home/jameszhao2004/catkin_ws/workspaces/scripts/set_teleop_mode.sh teleop
 source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
 source /home/jameszhao2004/catkin_ws/.venv_train_act/bin/activate
 python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/run_act_checkpoint_ros.py \
-  --checkpoint-dir /home/jameszhao2004/catkin_ws/outputs/train/act_20260218_smoke/checkpoints/000200/pretrained_model \
+  --checkpoint-dir /home/jameszhao2004/catkin_ws/policies/by_run/<run_name>/best \
   --device cuda \
   --rate 20 \
   --temporal-ensemble-coeff 0.01 \

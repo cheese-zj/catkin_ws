@@ -9,6 +9,7 @@
     <arg name="auto_enable" default="true" />
     <arg name="gripper_val_mutiple" default="2" />
     <arg name="girpper_exist" default="true" />
+    <arg name="enforce_joint_limits" default="true" />
 
     <!-- Arguments for cameras -->
     <arg name="enable_cameras" default="true" />
@@ -34,7 +35,9 @@
     <!-- Launch dual-arm control node -->
     <!-- Note: Parameters (can_port, topic_prefix, remap) are configured in piper_dual.yaml -->
     <group if="$(arg enable_dual_arm)">
-        <include file="$(find piper_ctrl)/launch/piper_dual_robot.launch" />
+        <include file="$(find piper_ctrl)/launch/piper_dual_robot.launch">
+            <arg name="enforce_joint_limits" value="$(arg enforce_joint_limits)" />
+        </include>
     </group>
 
     <!-- Launch lab RealSense camera stack: D405 left/right wrists + D435 overhead -->

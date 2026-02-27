@@ -6,20 +6,11 @@ This node is publish-only by design:
 - It does NOT publish slave_follow_flag.
 - It does NOT change teleop modes.
 
-IMPORTANT (2026-02-23):
-  Training ownership moved to /home/jameszhao2004/training_codebase.
-  Do not launch new training jobs from catkin_ws.
-  Canonical policy artifacts live under /home/jameszhao2004/training_codebase/outputs/train.
-
-Example (direct checkpoint alias load):
+Example:
   source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
   source /home/jameszhao2004/catkin_ws/.venv_train_act/bin/activate
   python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/run_act_checkpoint_ros.py \
-    --checkpoint-dir /home/jameszhao2004/catkin_ws/policies/by_run/<run_name>/best
-
-Preferred quick-load wrapper:
-  bash /home/jameszhao2004/training_codebase/pipeline/scripts/trainctl.sh policy \
-    --run-name <run_name> --step best --device cuda --rate 20
+    --checkpoint-dir /home/jameszhao2004/catkin_ws/outputs/train/act_20260218_smoke/checkpoints/000200/pretrained_model
 """
 
 from __future__ import annotations
@@ -54,6 +45,12 @@ except Exception as exc:  # pragma: no cover
         "lerobot is required in this environment. Use Python>=3.10 venv in ROS container."
     ) from exc
 
+try:
+    from deploy_attnmap_helper import *  # type: ignore
+except Exception as exc:  # pragma: no cover
+    raise SystemExit("attnmap viewer and recorder are required in this environment.") from exc
+
+
 
 DEFAULT_JOINT_NAMES = "joint1,joint2,joint3,joint4,joint5,joint6,gripper"
 
@@ -63,6 +60,8 @@ class GuardProfile:
     ema_alpha: float
     max_joint_step: float
     max_gripper_step: float
+    gripper_min: float
+    gripper_max: float
 
 
 GUARD_PRESETS: Dict[str, GuardProfile] = {
@@ -70,16 +69,22 @@ GUARD_PRESETS: Dict[str, GuardProfile] = {
         ema_alpha=0.25,
         max_joint_step=0.03,
         max_gripper_step=0.003,
+        gripper_min=0.0,
+        gripper_max=0.08,
     ),
     "medium": GuardProfile(
         ema_alpha=0.40,
         max_joint_step=0.05,
         max_gripper_step=0.005,
+        gripper_min=0.0,
+        gripper_max=0.08,
     ),
     "aggressive": GuardProfile(
         ema_alpha=0.60,
         max_joint_step=0.08,
         max_gripper_step=0.01,
+        gripper_min=0.0,
+        gripper_max=0.08,
     ),
 }
 
@@ -144,6 +149,26 @@ class PolicyPublisherNode:
         self.device = self._resolve_device(args.device)
 
         self.policy, self.preprocessor, self.postprocessor = self._load_policy_and_processors()
+
+        # NOTE-Add:attnmap
+        self.attn_viewer = RealTimeAttnViewer(
+            policy=self.policy,
+            device=self.device,
+            window_name="ACT Cross-Attn (L | Top | R)",
+            n_1d_tokens=2,
+            n_cams=3,
+            cam_hw=(8, 8),
+            out_hw=(self.args.image_height, self.args.image_width),
+            reduce_queries="mean",   # recommended for streaming
+            reduce_heads="mean",
+            alpha=0.45,
+            save_dir = '/home/jameszhao2004/catkin_ws/data/attn_maps_x/frames'
+        )
+        self.recorder = AttnVideoRecorder("/home/jameszhao2004/catkin_ws/data/attn_maps_x/attn_overlay.mp4", fps=30)
+        self._attn_step = 0
+        self.attn_stride = 2
+        # NOTE-Add:attnmap
+
 
         self.pub_left = rospy.Publisher(args.out_left_topic, JointState, queue_size=1)
         self.pub_right = rospy.Publisher(args.out_right_topic, JointState, queue_size=1)
@@ -429,8 +454,30 @@ class PolicyPublisherNode:
                 model_inputs[key] = value
         with torch.inference_mode():
             action = self.policy.select_action(model_inputs)
+        
+        # NOTE-visualize attention
+        if self._attn_step % self.attn_stride == 0:
+            grid = self.attn_viewer.step_show_cross(
+                top_chw01=snap.top_image,
+                left_chw01=snap.left_image,
+                right_chw01=snap.right_image,
+                save=True,
+                step_idx=self._attn_step,
+            )
+            if grid is not None:
+                self.recorder.write(grid)
+        else:
+            self.attn_viewer.step_show_cross(
+                top_chw01=snap.top_image,
+                left_chw01=snap.left_image,
+                right_chw01=snap.right_image,
+                save=False,
+                step_idx=self._attn_step,
+            )
+        self._attn_step += 1
+        # NOTE-visualize attention
+        
         action = self.postprocessor(action)
-
         if isinstance(action, torch.Tensor):
             action_np = action.detach().cpu().numpy()
         else:
@@ -464,6 +511,7 @@ class PolicyPublisherNode:
 
     def _guard_single(self, raw: np.ndarray, prev: np.ndarray) -> np.ndarray:
         target = raw.copy()
+        target[6] = np.clip(target[6], self.guard.gripper_min, self.guard.gripper_max)
 
         delta = target - prev
         delta[:6] = np.clip(delta[:6], -self.guard.max_joint_step, self.guard.max_joint_step)
@@ -471,6 +519,7 @@ class PolicyPublisherNode:
         stepped = prev + delta
 
         cmd = self.guard.ema_alpha * stepped + (1.0 - self.guard.ema_alpha) * prev
+        cmd[6] = np.clip(cmd[6], self.guard.gripper_min, self.guard.gripper_max)
         return cmd.astype(np.float32)
 
     def _publish_joint(self, pub, position: np.ndarray, stamp: rospy.Time):
@@ -491,38 +540,47 @@ class PolicyPublisherNode:
             rospy.loginfo("Startup grace: %.2f s (waiting for subscriber handshakes)", self.args.startup_grace_sec)
             rospy.sleep(self.args.startup_grace_sec)
 
-        while not rospy.is_shutdown():
-            snap = self._snapshot()
-            if snap is None:
-                missing = ",".join(self._missing_streams())
-                rospy.loginfo_throttle(2.0, "Waiting for required streams: %s", missing)
-                if self.args.debug_streams:
-                    self._debug_streams()
-                rate.sleep()
-                continue
+        try:
+            while not rospy.is_shutdown():
+                snap = self._snapshot()
+                if snap is None:
+                    missing = ",".join(self._missing_streams())
+                    rospy.loginfo_throttle(2.0, "Waiting for required streams: %s", missing)
+                    if self.args.debug_streams:
+                        self._debug_streams()
+                    rate.sleep()
+                    continue
 
-            now = rospy.Time.now().to_sec()
-            healthy, reason = self._health_ok(snap, now)
-            if not healthy:
-                rospy.logwarn_throttle(2.0, "Input unhealthy, skip publish: %s", reason)
-                rate.sleep()
-                continue
+                now = rospy.Time.now().to_sec()
+                healthy, reason = self._health_ok(snap, now)
+                if not healthy:
+                    rospy.logwarn_throttle(2.0, "Input unhealthy, skip publish: %s", reason)
+                    rate.sleep()
+                    continue
 
+                try:
+                    action = self._infer_action(snap)
+                except Exception as exc:
+                    rospy.logerr_throttle(2.0, "Inference failed: %s", str(exc))
+                    rate.sleep()
+                    continue
+
+                left_raw = action[:7]
+                right_raw = action[7:]
+                left_cmd, right_cmd = self._apply_guard(left_raw, right_raw, snap)
+                stamp = rospy.Time.now()
+                self._publish_joint(self.pub_left, left_cmd, stamp)
+                self._publish_joint(self.pub_right, right_cmd, stamp)
+                rate.sleep()
+        ## NOTE-close attn_viewer
+        finally:
             try:
-                action = self._infer_action(snap)
+                if getattr(self, "attn_viewer", None) is not None:
+                    self.attn_viewer.close()
+                if getattr(self, "recorder", None) is not None:
+                    self.recorder.close()
             except Exception as exc:
-                rospy.logerr_throttle(2.0, "Inference failed: %s", str(exc))
-                rate.sleep()
-                continue
-
-            left_raw = action[:7]
-            right_raw = action[7:]
-            left_cmd, right_cmd = self._apply_guard(left_raw, right_raw, snap)
-            stamp = rospy.Time.now()
-            self._publish_joint(self.pub_left, left_cmd, stamp)
-            self._publish_joint(self.pub_right, right_cmd, stamp)
-            rate.sleep()
-
+                rospy.logwarn("Failed to close attention viewer/recorder: %s", exc)
 
 def make_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -607,6 +665,7 @@ def main():
     rospy.init_node("run_act_checkpoint_ros")
     node = PolicyPublisherNode(args)
     node.run()
+    
 
 
 if __name__ == "__main__":
