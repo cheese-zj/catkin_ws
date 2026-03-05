@@ -2,7 +2,8 @@
 """Keyboard-driven ACT rosbag recorder.
 
 Controls:
-  SPACE: start/stop current episode
+  S:     start a new episode
+  SPACE: stop current episode
   P:     pause current episode recording
   R:     resume paused episode recording
   Q:     stop recording if needed and quit
@@ -201,7 +202,8 @@ class Recorder:
         self.last_stop_reason: Optional[str] = None
 
         self.debounce_sec = max(0.0, args.debounce_ms / 1000.0)
-        self.last_space_ts = 0.0
+        self.last_start_ts = 0.0
+        self.last_stop_ts = 0.0
         self.record_status_interval_sec = max(0.1, args.record_status_interval_sec)
         self.save_status_interval_sec = max(0.1, args.save_status_interval_sec)
         self.last_record_status_ts = 0.0
@@ -875,7 +877,7 @@ class Recorder:
         print(f"Next episode: episode_{self.next_episode_index:03d}")
         print(f"Async save workers: {self.save_workers}")
         print(
-            "Keys: SPACE=start/stop(+policy), "
+            "Keys: S=start(+policy), SPACE=stop(+policy), "
             "P=stop_policy+pause+switch_to_teleop_control, "
             "R=switch_to_robot_policy+resume+start_policy, Q=quit"
         )
@@ -1920,14 +1922,18 @@ class Recorder:
                     ch = sys.stdin.read(1)
                     now = time.monotonic()
 
-                    if ch == " ":
-                        if now - self.last_space_ts < self.debounce_sec:
+                    if ch in ("s", "S"):
+                        if now - self.last_start_ts < self.debounce_sec:
                             continue
-                        self.last_space_ts = now
+                        self.last_start_ts = now
+                        if not self.episode_open:
+                            self._start_episode()
+                    elif ch == " ":
+                        if now - self.last_stop_ts < self.debounce_sec:
+                            continue
+                        self.last_stop_ts = now
                         if self.episode_open:
                             self._stop_episode("user_stop")
-                        else:
-                            self._start_episode()
                     elif ch in ("p", "P"):
                         self._pause_episode()
                     elif ch in ("r", "R"):

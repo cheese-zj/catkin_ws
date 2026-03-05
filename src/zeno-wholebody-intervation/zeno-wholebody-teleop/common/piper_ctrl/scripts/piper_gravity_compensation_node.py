@@ -24,10 +24,10 @@ class GravityCompensationArm:
         Initialize gravity compensation node
 
         Args:
-            arm_side: Arm side, 'left' or 'right'
+            arm_side: Arm side, 'left', 'right', or 'opp'
         """
-        if arm_side not in ["left", "right"]:
-            raise ValueError("arm_side must be 'left' or 'right'")
+        if arm_side not in ["left", "right", "opp"]:
+            raise ValueError("arm_side must be 'left', 'right', or 'opp'")
 
         self.arm_side = arm_side
         self.urdf_package = rospy.get_param("~urdf_package", "piper_x_description")
@@ -417,15 +417,21 @@ def check_ros_master():
 
 
 def main():
-    """Main function: create gravity compensation nodes for both arms"""
+    """Main function: create gravity compensation nodes for both arms (and optional opp arm)."""
     try:
         check_ros_master()
 
         rospy.init_node("piper_gravity_compensation_node", anonymous=False)
 
-        rospy.loginfo("Creating gravity compensation nodes for both arms...")
-        arm_left = GravityCompensationArm(arm_side="left")
-        arm_right = GravityCompensationArm(arm_side="right")
+        enable_opp_arm = bool(rospy.get_param("~enable_opp_arm", False))
+        rospy.loginfo("Creating gravity compensation nodes (left/right, enable_opp_arm=%s)...", enable_opp_arm)
+        arms = [
+            GravityCompensationArm(arm_side="left"),
+            GravityCompensationArm(arm_side="right"),
+        ]
+        if enable_opp_arm:
+            arms.append(GravityCompensationArm(arm_side="opp"))
+            rospy.loginfo("OPP gravity compensation enabled: publishing /robot/arm_opp/joint_states_compensated")
 
         rospy.loginfo("Gravity compensation nodes initialized successfully")
         rospy.loginfo("Gripper gravity included in calculation")

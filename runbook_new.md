@@ -1,3 +1,11 @@
+# NOTE
+
+This file is kept as an operator scratchpad.
+Canonical guidebooks are now:
+
+- `/home/jameszhao2004/catkin_ws/workspaces/README.md`
+- `/home/jameszhao2004/catkin_ws/workspaces/LAUNCH_RUNBOOK.md`
+- `/home/jameszhao2004/catkin_ws/workspaces/RUNBOOK_3ARM_INTERVENTION.md`
 
 
 # Runbook v1.0
@@ -50,6 +58,7 @@ ros1
 source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
 roslaunch robot_setup start_robot_all.launch \
   left_can_port:=can_sl right_can_port:=can_sr \
+  enable_opp_arm:=true \
   enable_cameras:=true enable_rviz:=true enable_handeye_tf:=true enable_fisheye:=false \
   camera_left_usb_port:=2-2.2.1.4 camera_right_usb_port:=2-2.2.1.2 camera_top_usb_port:=2-2.2.1.3
 ```
@@ -65,9 +74,11 @@ You should be able to see
 ```bash
 ros1
 source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_teleop.sh
-roslaunch teleop_setup start_teleop_all.launch \
+rospack find teleop_setup
+roslaunch /home/jameszhao2004/catkin_ws/src/zeno-wholebody-intervation/zeno-wholebody-teleop/teleop_side/teleop_setup/launch/start_teleop_all.launch \
   left_can_port:=can_ml right_can_port:=can_mr \
   enable_paddle:=false \
+  enable_opp_arm:=true \
   master_slave_enable:=true mit_enable_tor:=true \
   mit_enable_pos:=true \
   mit_max_torque_abs:=8.0 \
@@ -80,8 +91,8 @@ roslaunch teleop_setup start_teleop_all.launch \
   gravity_max_joint_step:=0.08 \
   gravity_max_torque_delta_warn:=2.0 \
   enforce_joint_limits:=true \
-  gravity_joint_scale_left:="[1.0, 0.96, 0.96, 0.95, 1.0, 1.0]" \
-  gravity_joint_scale_right:="[1.0, 0.96, 0.96, 0.95, 1.0, 1.0]" \
+  gravity_joint_scale_left:="[1.0, 0.96, 0.96, 0.94, 1.0, 1.0]" \
+  gravity_joint_scale_right:="[1.0, 0.96, 0.96, 0.94, 1.0, 1.0]" \
   gripper_haptic_effort_sign:=-1.0 \
   gripper_haptic_effort_deadband:=0.0 \
   gripper_haptic_effort_bias:=0.20 \
@@ -95,15 +106,36 @@ roslaunch teleop_setup start_teleop_all.launch \
   gripper_haptic_opening_direction_eps:=0.00002
 ```
 
-#### Record ACT Rosbag Episodes
+`rospack find teleop_setup` expected path:
+- `/home/jameszhao2004/catkin_ws/src/zeno-wholebody-intervation/zeno-wholebody-teleop/teleop_side/teleop_setup`
 
-Terminal 4 recorder
+#### Terminal 4 opp master switch (keyboard)
 ```bash
 ros1
 source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
-python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/record_act_keyboard.py
+rosparam get /piper_gravity_compensation_node/enable_opp_arm
+rostopic echo -n1 /robot/arm_opp/joint_states_compensated
+python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/opp_master_switch.py
 ```
-python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/record_act_keyboard_intervention.py
+
+Keyboard:
+- `1`: `arm_opp` follows `/teleop/arm_left/joint_states_single`
+- `2`: `arm_opp` follows `/teleop/arm_right/joint_states_single`
+- `h`: `arm_opp` hold current position
+- `q`: quit switcher
+
+`arm_opp` defaults to hold after startup. Press `1` or `2` to attach it to a master arm.
+
+#### Record ACT Rosbag Episodes
+
+Terminal 5 recorder
+```bash
+ros1
+source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
+python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/record_act_keyboard_intervention.py \
+  --profile /home/jameszhao2004/catkin_ws/workspaces/config/rosbag_profiles/act_rgb_3arm_profile.yaml
+```
+
 
 Default behavior (no extra args):
 - profile: `workspaces/config/rosbag_profiles/act_rgb_profile.yaml`
@@ -152,22 +184,42 @@ pipeline/scripts/convert_session.sh \
 
 ## Run Policy
 ```bash
+source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
 source /home/jameszhao2004/catkin_ws/.venv_train_act/bin/activate
 
 rosservice call /robot/arm_left/joint_cmd_mux_select /robot/arm_left/vla_joint_cmd
 rosservice call /robot/arm_right/joint_cmd_mux_select /robot/arm_right/vla_joint_cmd
 
 OUT_ROOT=/home/jameszhao2004/training_codebase/outputs/train
-RUN_NAME=towel_folding_260224_act_v30_fps30_local_20260225_034326_chunk80
-CKPT_STEP=050000
+RUN_NAME=pick_place_out_of_view_new_40_merged_with_intervention_teleop_v30_fps30_local_20260304_001139
+CKPT_STEP=080000
+
+OUT_ROOT=/home/jameszhao2004/training_codebase/outputs/train
+RUN_NAME=pick_place_out_of_view_new_40_v30_fps30_local_20260303_034747
+CKPT_STEP=060000
 
 python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/run_act_checkpoint_ros.py \
   --checkpoint-dir ${OUT_ROOT}/${RUN_NAME}/checkpoints/${CKPT_STEP}/pretrained_model/ \
   --device cuda \
   --rate 30 \
-  --temporal-ensemble-coeff 0.006 \
+  --temporal-ensemble-coeff 0.01 \
   --guard-profile medium \
   --debug-streams
+```
+
+# Intervention Data Extract and Merge
+
+```bash
+python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/extract_teleop_segments.py \
+  --session-dir /home/jameszhao2004/catkin_ws/data/rosbags/test_intervention_001 \
+  --output-root /home/jameszhao2004/catkin_ws/data/rosbags/test_intervention_001_teleop_only \
+  --overwrite
+
+python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/merge_rosbag_sessions.py \
+  --demo-session-dir /home/jameszhao2004/catkin_ws/data/rosbags/towel_folding_260224_act \
+  --teleop-session-dir /home/jameszhao2004/catkin_ws/data/rosbags/test_intervention_001_teleop_only \
+  --output-root /home/jameszhao2004/catkin_ws/data/rosbags/towel_folding_260224_act_mix_teleop \
+  --overwrite
 ```
 
 **Monica attention Map**
@@ -182,29 +234,18 @@ python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/run_act_checkpoint_ros_
 ```
 
 
-ros1
-source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
-source /home/jameszhao2004/catkin_ws/.venv_train_act/bin/activate
-python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/pr_switch_smoke_test.py
-
-
-
-python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/record_act_keyboard_intervention.py --session-name test_intervention_001
-
-
-
-
 source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
 source /home/jameszhao2004/catkin_ws/.venv_train_act/bin/activate
 
 rosservice call /robot/arm_left/joint_cmd_mux_select /robot/arm_left/vla_joint_cmd
 rosservice call /robot/arm_right/joint_cmd_mux_select /robot/arm_right/vla_joint_cmd
 
-
-CKPT="$(ls -td /home/jameszhao2004/training_codebase/outputs/train/towel_folding_260224_phasehf_chunk80_20260227_211402/checkpoints/last/pretrained_model | head -n1)"
-echo "$CKPT"
-
-python3 /home/jameszhao2004/training_codebase/pipeline/scripts/run_act_checkpoint_ros_modeaware.py \
+cd /home/jameszhao2004/training_codebase && \
+source .venv/bin/activate && \
+RUN_DIR=$(ls -dt outputs/train/burst_towel_20260228_phasehf_mg014_hn028_hq010_chunk24* | head -n1) && \
+CKPT=$(ls -dt "$RUN_DIR"/checkpoints/*/pretrained_model | head -n1) && \
+echo "Using checkpoint: $CKPT" && \
+python3 pipeline/scripts/run_act_checkpoint_ros_modeaware.py \
   --checkpoint-dir "$CKPT" \
   --device cuda \
   --rate 30 \
@@ -212,8 +253,29 @@ python3 /home/jameszhao2004/training_codebase/pipeline/scripts/run_act_checkpoin
   --temporal-ensemble-coeff 0.001 \
   --fast-mode on \
   --fast-detector joint_speed \
-  --fast-thresh 1.0 \
+  --fast-enter-thresh 1.2 \
+  --fast-exit-thresh 0.9 \
+  --fast-metric-ema-alpha 0.35 \
+  --mode-min-dwell-steps 5 \
   --k-slow 1 \
   --k-fast 1 \
-  --exec-steps-fast 80 \
-  --disable-ensemble-fast
+  --exec-steps-fast 1 \
+  --disable-ensemble-fast \
+  --enable-fast-guard \
+  --fast-guard-alpha 1.0 \
+  --fast-max-joint-step 0.08
+
+python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/record_act_keyboard_intervention.py
+
+python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/record_act_keyboard_intervention_switch_only.py
+
+source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_teleop.sh
+
+echo "[A] 只切 follow flag，不调 enable"
+rostopic pub --once /conrft_robot/slave_follow_flag std_msgs/Bool "data: true"
+sleep 1
+rostopic pub --once /conrft_robot/slave_follow_flag std_msgs/Bool "data: false"
+
+echo "[B] 只调 enable，不切 follow flag"
+rosservice call /teleop/arm_left/enable_srv "enable_request: true"
+rosservice call /teleop/arm_right/enable_srv "enable_request: true"

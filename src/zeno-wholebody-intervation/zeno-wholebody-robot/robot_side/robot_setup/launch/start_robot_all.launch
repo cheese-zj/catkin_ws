@@ -3,9 +3,11 @@
     <arg name="ranger_can_port" default="can0" />
     <arg name="left_can_port" default="can_left" />
     <arg name="right_can_port" default="can_right" />
+    <arg name="opp_can_port" default="can_opp" />
 
     <!-- Arguments for dual-arm control -->
     <arg name="enable_dual_arm" default="true" />
+    <arg name="enable_opp_arm" default="false" />
     <arg name="auto_enable" default="true" />
     <arg name="gripper_val_mutiple" default="2" />
     <arg name="girpper_exist" default="true" />
@@ -37,6 +39,10 @@
     <group if="$(arg enable_dual_arm)">
         <include file="$(find piper_ctrl)/launch/piper_dual_robot.launch">
             <arg name="enforce_joint_limits" value="$(arg enforce_joint_limits)" />
+            <arg name="enable_opp_arm" value="$(arg enable_opp_arm)" />
+            <arg name="left_can_port" value="$(arg left_can_port)" />
+            <arg name="right_can_port" value="$(arg right_can_port)" />
+            <arg name="opp_can_port" value="$(arg opp_can_port)" />
         </include>
     </group>
 

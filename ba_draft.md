@@ -53,7 +53,7 @@ roslaunch teleop_setup start_teleop_all.launch \
 
 
 ## videos in rosbag -> mp4
-python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/unpack_bag_videos.py --bag /home/jameszhao2004/catkin_ws/data/rosbags/act_20260224_182749/episode_060/episode.bag --output-dir /home/jameszhao2004/catkin_ws/data/rosbags/act_20260224_182749/episode_060/episode_videos_mp4  --codec mp4v   --container mp4
+python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/unpack_bag_videos.py --bag /home/jameszhao2004/catkin_ws/data/rosbags/pick&place(out of view) new 100/episode_001/episode.bag --output-dir /home/jameszhao2004/catkin_ws/data/rosbags/pick&place(outof view) new 100/episode_001/episode_videos_mp4  --codec mp4v   --container mp4
 
 
 ## train history (DEPRECATED: do not run here; use training_codebase/pipeline/scripts/trainctl.sh)

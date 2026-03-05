@@ -16,6 +16,7 @@ collisions between:
 - `workspaces/scripts/build_teleop_ws.sh`: build teleop workspace
 - `workspaces/LAUNCH_RUNBOOK.md`: lab launch checklist and troubleshooting
 - `workspaces/LAUNCH_RUNBOOK_CN.md`: Chinese launch checklist and troubleshooting
+- `workspaces/RUNBOOK_3ARM_INTERVENTION.md`: 3-arm intervention workflow (OPP switch + recorder)
 
 Each workspace uses symlinks to shared dependencies (`piper_ros`,
 `piper_teleop`, `realsense-ros`) plus one zeno side only.
@@ -27,6 +28,32 @@ and troubleshooting, use:
 
 - `workspaces/LAUNCH_RUNBOOK.md`
 - `workspaces/LAUNCH_RUNBOOK_CN.md`
+
+For 3-arm intervention sessions (robot left/right + OPP + keyboard switch):
+
+- `workspaces/RUNBOOK_3ARM_INTERVENTION.md`
+
+## Guidebook Selector
+
+Use this table as the document entrypoint:
+
+| Scenario | Use this guide first | Notes |
+|---|---|---|
+| First-time workspace bring-up | `workspaces/README.md` | Build/source scripts and isolation rules |
+| Daily 2-arm robot+teleop launch | `workspaces/LAUNCH_RUNBOOK.md` | Canonical baseline in English |
+| Daily 2-arm launch (Chinese) | `workspaces/LAUNCH_RUNBOOK_CN.md` | Same baseline in Chinese |
+| 3-arm intervention data collection | `workspaces/RUNBOOK_3ARM_INTERVENTION.md` | Includes OPP gravity checks and `opp_master_switch.py` |
+| Burst pipeline operations | `README_burst_monitor.md` | Burst-specific scripts and checks |
+| Host/docker environment setup | `DOCKER_SETUP_README.md` | Host-side environment and container notes |
+
+## 3-Arm Documentation Notes
+
+- Always verify teleop package resolution before a 3-arm session:
+  `rospack find teleop_setup`
+- In strict mode, `opp_master_switch.py` requires:
+  `/robot/arm_opp/joint_states_compensated`
+- If OPP compensated topic is missing, check:
+  `rosparam get /piper_gravity_compensation_node/enable_opp_arm`
 
 ## Safe Usage
 

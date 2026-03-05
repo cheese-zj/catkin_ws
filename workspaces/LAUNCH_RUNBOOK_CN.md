@@ -3,6 +3,10 @@
 这是实验室使用的运行手册，用于在角色隔离的 Catkin 工作空间中启动
 robot 侧与 teleop 侧。
 
+如果是 3 臂 intervention 场景（包含 `arm_opp` 与 `opp_master_switch.py`），请使用：
+
+- `/home/jameszhao2004/catkin_ws/workspaces/RUNBOOK_3ARM_INTERVENTION.md`
+
 ## 1) 实验室 CAN 命名
 
 本实验室使用以下接口命名：

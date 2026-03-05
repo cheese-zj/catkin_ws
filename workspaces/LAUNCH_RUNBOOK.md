@@ -3,6 +3,10 @@
 This is the lab runbook for launching robot-side and teleop-side stacks with
 role-isolated Catkin workspaces.
 
+For 3-arm intervention sessions (with `arm_opp` + `opp_master_switch.py`), use:
+
+- `/home/jameszhao2004/catkin_ws/workspaces/RUNBOOK_3ARM_INTERVENTION.md`
+
 ## 1) Lab CAN Naming
 
 Use these interface names in this lab:

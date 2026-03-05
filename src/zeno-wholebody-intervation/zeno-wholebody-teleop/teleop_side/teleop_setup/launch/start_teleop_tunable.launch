@@ -4,6 +4,7 @@
   <arg name="right_can_port" default="can_mr" />
   <arg name="enable_paddle" default="false" />
   <arg name="enable_dual_arm" default="true" />
+  <arg name="enable_opp_arm" default="false" />
   <arg name="enable_gravity_compensation" default="true" />
 
   <!-- Tune these parameters in one file instead of long CLI overrides -->
@@ -17,6 +18,7 @@
     <arg name="right_can_port" value="$(arg right_can_port)" />
     <arg name="enable_paddle" value="$(arg enable_paddle)" />
     <arg name="enable_dual_arm" value="$(arg enable_dual_arm)" />
+    <arg name="enable_opp_arm" value="$(arg enable_opp_arm)" />
     <arg name="enable_gravity_compensation" value="$(arg enable_gravity_compensation)" />
   </include>
 

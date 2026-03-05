@@ -44,6 +44,67 @@
   <!-- Load node-specific parameters once to avoid cross-node overwrite races -->
   <rosparam file="$(find piper_ctrl)/config/piper_dual.yaml" command="load" ns="/"/>
 
+  <!-- Torque feedback routing muxes:
+       default left->/robot/arm_left/joint_states_single
+       default right->/robot/arm_right/joint_states_single
+       opp_master_switch.py can temporarily switch either side to /robot/arm_opp/joint_states_single -->
+  <node pkg="topic_tools" type="mux" name="mux_teleop_left_torque_feedback"
+        args="/teleop/arm_left/torque_feedback_mux
+              /robot/arm_left/joint_states_single
+              /robot/arm_opp/joint_states_single
+              /teleop/arm_left/opp_torque_feedback"
+        output="screen">
+    <param name="~default" value="/robot/arm_left/joint_states_single" />
+  </node>
+
+  <node pkg="topic_tools" type="mux" name="mux_teleop_right_torque_feedback"
+        args="/teleop/arm_right/torque_feedback_mux
+              /robot/arm_right/joint_states_single
+              /robot/arm_opp/joint_states_single
+              /teleop/arm_right/opp_torque_feedback"
+        output="screen">
+    <param name="~default" value="/robot/arm_right/joint_states_single" />
+  </node>
+
+  <!-- Gravity compensation routing muxes:
+       default left->/robot/arm_left/joint_states_compensated
+       default right->/robot/arm_right/joint_states_compensated
+       opp_master_switch.py can temporarily switch either side to /robot/arm_opp/joint_states_compensated -->
+  <node pkg="topic_tools" type="mux" name="mux_teleop_left_gravity_feedback"
+        args="/teleop/arm_left/gravity_feedback_mux
+              /robot/arm_left/joint_states_compensated
+              /robot/arm_opp/joint_states_compensated"
+        output="screen">
+    <param name="~default" value="/robot/arm_left/joint_states_compensated" />
+  </node>
+
+  <node pkg="topic_tools" type="mux" name="mux_teleop_right_gravity_feedback"
+        args="/teleop/arm_right/gravity_feedback_mux
+              /robot/arm_right/joint_states_compensated
+              /robot/arm_opp/joint_states_compensated"
+        output="screen">
+    <param name="~default" value="/robot/arm_right/joint_states_compensated" />
+  </node>
+
+  <!-- Master command routing muxes:
+       default uses the master arm's own joint_states_single (original behavior),
+       optional alignment topic can be selected by opp_master_switch.py for smooth handover. -->
+  <node pkg="topic_tools" type="mux" name="mux_teleop_left_master_cmd"
+        args="/teleop/arm_left/master_cmd_mux
+              /teleop/arm_left/joint_states_single
+              /teleop/arm_left/alignment_joint_cmd"
+        output="screen">
+    <param name="~default" value="/teleop/arm_left/joint_states_single" />
+  </node>
+
+  <node pkg="topic_tools" type="mux" name="mux_teleop_right_master_cmd"
+        args="/teleop/arm_right/master_cmd_mux
+              /teleop/arm_right/joint_states_single
+              /teleop/arm_right/alignment_joint_cmd"
+        output="screen">
+    <param name="~default" value="/teleop/arm_right/joint_states_single" />
+  </node>
+
   <!-- Left arm node -->
   <node name="piper_teleop_left_node" pkg="piper_ctrl" type="piper_ctrl_node.py" output="screen">
     <!-- Load control parameters (with gravity compensation) to node's private namespace -->
@@ -57,6 +118,8 @@
     <param name="mit/max_torque_abs" value="$(arg mit_max_torque_abs)" />
     <rosparam subst_value="true" param="mit/torque_scale">$(arg mit_torque_scale_left)</rosparam>
     <rosparam subst_value="true" param="mit/torque_feedback_sign">$(arg mit_torque_feedback_sign_left)</rosparam>
+    <param name="remap/joint_pos_cmd_to" value="/teleop/arm_left/master_cmd_mux" />
+    <param name="remap/gripper_pos_cmd_to" value="/teleop/arm_left/master_cmd_mux" />
     <param name="enforce_joint_limits" value="$(arg enforce_joint_limits)" />
     <param name="gripper_haptic_effort_sign" value="$(arg gripper_haptic_effort_sign)" />
     <param name="gripper_haptic_effort_deadband" value="$(arg gripper_haptic_effort_deadband)" />
@@ -90,6 +153,8 @@
     <param name="mit/max_torque_abs" value="$(arg mit_max_torque_abs)" />
     <rosparam subst_value="true" param="mit/torque_scale">$(arg mit_torque_scale_right)</rosparam>
     <rosparam subst_value="true" param="mit/torque_feedback_sign">$(arg mit_torque_feedback_sign_right)</rosparam>
+    <param name="remap/joint_pos_cmd_to" value="/teleop/arm_right/master_cmd_mux" />
+    <param name="remap/gripper_pos_cmd_to" value="/teleop/arm_right/master_cmd_mux" />
     <param name="enforce_joint_limits" value="$(arg enforce_joint_limits)" />
     <param name="gripper_haptic_effort_sign" value="$(arg gripper_haptic_effort_sign)" />
     <param name="gripper_haptic_effort_deadband" value="$(arg gripper_haptic_effort_deadband)" />

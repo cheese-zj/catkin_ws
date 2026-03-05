@@ -1,0 +1,67 @@
+profile_name: act_rgb_3arm
+camera_transport: compressed
+
+# Camera naming contract for this setup:
+# - /realsense_left  => left wrist camera
+# - /realsense_right => right wrist camera
+# - /realsense_top   => overhead camera
+
+required_topics:
+  - /robot/arm_left/joint_states_single
+  - /robot/arm_right/joint_states_single
+  - /robot/arm_opp/joint_states_single
+  - /teleop/arm_left/joint_states_single
+  - /teleop/arm_right/joint_states_single
+  - /robot/arm_left/end_pose
+  - /robot/arm_right/end_pose
+  - /robot/arm_opp/end_pose
+  - /teleop/arm_left/end_pose
+  - /teleop/arm_right/end_pose
+  - /robot/arm_left/end_pose_euler
+  - /robot/arm_right/end_pose_euler
+  - /robot/arm_opp/end_pose_euler
+  - /teleop/arm_left/end_pose_euler
+  - /teleop/arm_right/end_pose_euler
+  - /robot/arm_left/joint_states_compensated
+  - /robot/arm_right/joint_states_compensated
+  - /robot/arm_opp/joint_states_compensated
+  - /robot/arm_left/joint_cmd_mux
+  - /robot/arm_right/joint_cmd_mux
+  - /robot/arm_opp/joint_cmd_mux
+
+required_joint_topics:
+  - /robot/arm_left/joint_states_single
+  - /robot/arm_right/joint_states_single
+  - /robot/arm_opp/joint_states_single
+  - /teleop/arm_left/joint_states_single
+  - /teleop/arm_right/joint_states_single
+
+camera_streams:
+  - image_base: /realsense_left/color/image_raw
+    camera_info: /realsense_left/color/camera_info
+  - image_base: /realsense_right/color/image_raw
+    camera_info: /realsense_right/color/camera_info
+  - image_base: /realsense_top/color/image_raw
+    camera_info: /realsense_top/color/camera_info
+
+optional_topics:
+  - /conrft_robot/slave_follow_flag
+  - /teleop/arm_left/enable_flag
+  - /teleop/arm_right/enable_flag
+  - /robot/arm_left/vla_joint_cmd
+  - /robot/arm_right/vla_joint_cmd
+  - /robot/arm_opp/vla_joint_cmd
+  - /robot/arm_opp/hold_joint_cmd
+  - /robot/arm_left/joint_cmd_mux/selected
+  - /robot/arm_right/joint_cmd_mux/selected
+  - /robot/arm_opp/joint_cmd_mux/selected
+
+hz_monitor_topics:
+  - /robot/arm_left/joint_states_single
+  - /robot/arm_right/joint_states_single
+  - /robot/arm_opp/joint_states_single
+  - /teleop/arm_left/joint_states_single
+  - /teleop/arm_right/joint_states_single
+  - /realsense_left/color/image_raw
+  - /realsense_right/color/image_raw
+  - /realsense_top/color/image_raw

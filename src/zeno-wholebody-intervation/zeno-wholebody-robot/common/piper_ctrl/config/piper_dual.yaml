@@ -45,6 +45,29 @@ piper_ctrl_right_node:
     joint_pos_cmd_to: /robot/arm_right/joint_cmd_mux
     gripper_pos_cmd_to: /robot/arm_right/joint_cmd_mux
 
+piper_ctrl_opp_node:
+  can_port: can_opp
+  topic_prefix: /robot/arm_opp/
+  auto_enable: true
+  gripper_exist: true
+  gripper_val_mutiple: 1.0
+  enable_gripper: true
+  enable_gripper_haptic: false
+  gripper_range: 0.08
+  gripper_reverse: false
+  gripper_pos_cmd_topic: gripper_pos_cmd
+  gripper_effort_cmd_topic: gripper_effort_cmd
+  p:
+    joint_pos_cmd_topic: joint_pos_cmd
+  mit:
+    joint_pos_cmd_topic: joint_pos_cmd
+    joint_vel_cmd_topic: joint_vel_cmd
+    joint_tor_cmd_topic: joint_tor_cmd
+    joint_states_compensated_topic: joint_states_compensated
+  remap:
+    joint_pos_cmd_to: /robot/arm_opp/joint_cmd_mux
+    gripper_pos_cmd_to: /robot/arm_opp/joint_cmd_mux
+
 piper_teleop_left_node:
   can_port: can_left
   topic_prefix: /teleop/arm_left/
@@ -54,7 +77,7 @@ piper_teleop_left_node:
   enable_gripper: true
   enable_gripper_haptic: true
   gripper_range: 0.08
-  gripper_reverse: true
+  gripper_reverse: false
   gripper_pos_cmd_topic: gripper_pos_cmd
   gripper_effort_cmd_topic: gripper_effort_cmd
   p:
@@ -79,7 +102,7 @@ piper_teleop_right_node:
   enable_gripper: true
   enable_gripper_haptic: true
   gripper_range: 0.08
-  gripper_reverse: true
+  gripper_reverse: false
   gripper_pos_cmd_topic: gripper_pos_cmd
   gripper_effort_cmd_topic: gripper_effort_cmd
   p:

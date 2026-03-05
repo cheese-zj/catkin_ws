@@ -109,7 +109,7 @@ piper_teleop_left_node:
     # Topic to subscribe master-slave switch flag (Bool: true=follow, false=teleop)
     master_flag_topic: "/conrft_robot/slave_follow_flag"
     # Higher kp values when in slave follow mode (to follow master arm)
-    kp_follow: [7.0, 7.0, 7.0, 7.0, 7.0, 7.0]
+    kp_follow: [10.0, 10.0, 10.0, 10.0, 10.0, 10.0]
   
   # Topic names (relative to topic_prefix)
   gripper_pos_cmd_topic: "gripper_pos_cmd"
@@ -125,10 +125,10 @@ piper_teleop_left_node:
   # Topic remapping (absolute paths)
   remap:
     joint_pos_cmd_to: "/teleop/arm_left/joint_states_single"
-    joint_tor_cmd_to: "/robot/arm_left/joint_states_single"
-    joint_states_compensated_to: "/robot/arm_left/joint_states_compensated"
+    joint_tor_cmd_to: "/teleop/arm_left/torque_feedback_mux"
+    joint_states_compensated_to: "/teleop/arm_left/gravity_feedback_mux"
     gripper_pos_cmd_to: "/teleop/arm_left/joint_states_single"
-    gripper_effort_cmd_to: "/robot/arm_left/joint_states_single"
+    gripper_effort_cmd_to: "/teleop/arm_left/torque_feedback_mux"
 
 # Right arm teleop node
 piper_teleop_right_node:
@@ -155,7 +155,7 @@ piper_teleop_right_node:
     # Topic to subscribe master-slave switch flag (Bool: true=follow, false=teleop)
     master_flag_topic: "/conrft_robot/slave_follow_flag"
     # Higher kp values when in slave follow mode (to follow master arm)
-    kp_follow: [7.0, 7.0, 7.0, 7.0, 7.0, 7.0]
+    kp_follow: [10.0, 10.0, 10.0, 10.0, 10.0, 10.0]
   
   # Topic names (relative to topic_prefix)
   gripper_pos_cmd_topic: "gripper_pos_cmd"
@@ -171,7 +171,7 @@ piper_teleop_right_node:
   # Topic remapping (absolute paths) 
   remap:
     joint_pos_cmd_to: "/teleop/arm_right/joint_states_single"
-    joint_tor_cmd_to: "/robot/arm_right/joint_states_single"
-    joint_states_compensated_to: "/robot/arm_right/joint_states_compensated"
+    joint_tor_cmd_to: "/teleop/arm_right/torque_feedback_mux"
+    joint_states_compensated_to: "/teleop/arm_right/gravity_feedback_mux"
     gripper_pos_cmd_to: "/teleop/arm_right/joint_states_single"
-    gripper_effort_cmd_to: "/robot/arm_right/joint_states_single"
+    gripper_effort_cmd_to: "/teleop/arm_right/torque_feedback_mux"

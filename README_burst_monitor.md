@@ -18,6 +18,17 @@ Threshold mode examples:
 # percentile (legacy)
 python tools/burst_batch_ros1.py --input-dir /data/episodes --out-dir burst_out_pct --threshold-mode percentile --merge-gap 0.12
 
+# event-centered (recommended): snap-driven split + 3-phase intent fields
+python tools/burst_batch_ros1.py --input-dir /data/episodes --out-dir burst_out_event \
+  --detection-mode event_centered \
+  --event-keep-topk 1 --event-rank-by peak_speed --event-force-primary \
+  --event-attach-gap 0.18 --event-attach-peak-ratio 0.62 \
+  --score-norm-base p90 --dtau-weight 0.5 \
+  --event-speed-alpha 0.4 --event-below-frames 3 \
+  --snap-peak-pct 85 --snap-min-speed-norm 0.6 --snap-min-gap 0.15 \
+  --snap-window 0.35 --shape-dct-k 4 \
+  --merge-gap 0.12
+
 # normalized + fixed threshold
 python tools/burst_batch_ros1.py --input-dir /data/episodes --out-dir burst_out_norm_fixed \
   --threshold-mode norm_fixed --norm-base p90 --on-abs 2.0 --off-abs 1.3 --merge-gap 0.12
@@ -41,10 +52,14 @@ Recommended run command:
 ```bash
 python tools/burst_batch_ros1.py \
   --input-dir /data/episodes \
-  --out-dir burst_out_all_norm \
-  --threshold-mode norm_fixed \
-  --norm-base p90 \
-  --on-abs 2.0 --off-abs 1.3 \
+  --out-dir burst_out_all_event \
+  --detection-mode event_centered \
+  --event-keep-topk 1 --event-rank-by peak_speed --event-force-primary \
+  --event-attach-gap 0.18 --event-attach-peak-ratio 0.62 \
+  --score-norm-base p90 --dtau-weight 0.5 \
+  --event-speed-alpha 0.4 --event-below-frames 3 \
+  --snap-peak-pct 85 --snap-min-speed-norm 0.6 --snap-min-gap 0.15 \
+  --snap-window 0.35 --shape-dct-k 4 \
   --peak-min-norm 3.0 \
   --merge-gap 0.12 \
   --uniform-speed-axis
@@ -54,6 +69,11 @@ Output layout (single + batch):
 - CSV files: `OUTDIR/csv/<episode>.csv`
 - Plots: `OUTDIR/plots/<episode>.png`
 - Batch summary: `OUTDIR/summary.csv`
+
+`event_centered` outputs extra per-burst columns in CSV:
+- snap center: `snap_time_s`, `snap_score`
+- phases: `windup_*`, `snap_*`, `follow_*`
+- intent vector: `z_amp_speed`, `z_amp_acc`, `z_dur`, `z_dir_unit`, `z_shape_dct`
 
 方案对比（碎片化 + 阈值漂移）:
 

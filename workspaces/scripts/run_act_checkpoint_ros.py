@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import argparse
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
@@ -139,7 +139,8 @@ class PolicyPublisherNode:
             "right_decode_fail": 0,
         }
 
-        self.guard = GUARD_PRESETS[args.guard_profile]
+        self.guard = self._resolve_guard_profile()
+        self._last_gripper_debug_sec: float = 0.0
         self.joint_names = self._parse_joint_names(args.joint_names)
         self.device = self._resolve_device(args.device)
 
@@ -167,6 +168,33 @@ class PolicyPublisherNode:
                 args.right_wrist_topic, CompressedImage, self._cb_right_image, queue_size=1, tcp_nodelay=True
             ),
         ]
+        rospy.loginfo(
+            "Guard config: profile=%s ema_alpha=%.4f max_joint_step=%.4f max_gripper_step=%.4f",
+            self.args.guard_profile,
+            self.guard.ema_alpha,
+            self.guard.max_joint_step,
+            self.guard.max_gripper_step,
+        )
+        rospy.loginfo(
+            "Action mode: arm=%s gripper=%s",
+            self.args.arm_action_mode,
+            self.args.gripper_action_mode,
+        )
+        if self.args.gripper_debug_interval_sec > 0.0:
+            rospy.loginfo(
+                "Gripper debug enabled. interval=%.2fs",
+                self.args.gripper_debug_interval_sec,
+            )
+
+    def _resolve_guard_profile(self) -> GuardProfile:
+        profile = GUARD_PRESETS[self.args.guard_profile]
+        if self.args.guard_ema_alpha is not None:
+            profile = replace(profile, ema_alpha=float(self.args.guard_ema_alpha))
+        if self.args.guard_max_joint_step is not None:
+            profile = replace(profile, max_joint_step=float(self.args.guard_max_joint_step))
+        if self.args.guard_max_gripper_step is not None:
+            profile = replace(profile, max_gripper_step=float(self.args.guard_max_gripper_step))
+        return profile
 
     def _resolve_device(self, requested: str) -> str:
         req = requested.strip().lower()
@@ -456,14 +484,15 @@ class PolicyPublisherNode:
         if self.prev_right_cmd is None:
             self.prev_right_cmd = snap.right_pos.copy()
 
-        left = self._guard_single(raw_left, self.prev_left_cmd)
-        right = self._guard_single(raw_right, self.prev_right_cmd)
+        left = self._guard_single(raw_left, self.prev_left_cmd, snap.left_pos)
+        right = self._guard_single(raw_right, self.prev_right_cmd, snap.right_pos)
         self.prev_left_cmd = left
         self.prev_right_cmd = right
+        self._maybe_log_gripper_debug(raw_left, left, snap.left_pos, raw_right, right, snap.right_pos)
         return left, right
 
-    def _guard_single(self, raw: np.ndarray, prev: np.ndarray) -> np.ndarray:
-        target = raw.copy()
+    def _guard_single(self, raw: np.ndarray, prev: np.ndarray, cur: np.ndarray) -> np.ndarray:
+        target = self._resolve_target_from_raw(raw, cur)
 
         delta = target - prev
         delta[:6] = np.clip(delta[:6], -self.guard.max_joint_step, self.guard.max_joint_step)
@@ -472,6 +501,54 @@ class PolicyPublisherNode:
 
         cmd = self.guard.ema_alpha * stepped + (1.0 - self.guard.ema_alpha) * prev
         return cmd.astype(np.float32)
+
+    def _resolve_target_from_raw(self, raw: np.ndarray, cur: np.ndarray) -> np.ndarray:
+        target = raw.copy()
+        if self.args.arm_action_mode == "delta":
+            target[:6] = cur[:6] + raw[:6]
+        if self.args.gripper_action_mode == "delta":
+            target[6] = cur[6] + raw[6]
+        return target
+
+    def _maybe_log_gripper_debug(
+        self,
+        raw_left: np.ndarray,
+        cmd_left: np.ndarray,
+        cur_left: np.ndarray,
+        raw_right: np.ndarray,
+        cmd_right: np.ndarray,
+        cur_right: np.ndarray,
+    ) -> None:
+        interval = self.args.gripper_debug_interval_sec
+        if interval <= 0.0:
+            return
+        now = rospy.Time.now().to_sec()
+        if now - self._last_gripper_debug_sec < interval:
+            return
+        self._last_gripper_debug_sec = now
+
+        raw_left_grip = float(raw_left[6])
+        cmd_left_grip = float(cmd_left[6])
+        cur_left_grip = float(cur_left[6])
+        raw_right_grip = float(raw_right[6])
+        cmd_right_grip = float(cmd_right[6])
+        cur_right_grip = float(cur_right[6])
+
+        rospy.loginfo(
+            "gripper_debug "
+            "left(raw=%.5f cmd=%.5f cur=%.5f raw_delta=%.5f cmd_delta=%.5f) "
+            "right(raw=%.5f cmd=%.5f cur=%.5f raw_delta=%.5f cmd_delta=%.5f)",
+            raw_left_grip,
+            cmd_left_grip,
+            cur_left_grip,
+            raw_left_grip - cur_left_grip,
+            cmd_left_grip - cur_left_grip,
+            raw_right_grip,
+            cmd_right_grip,
+            cur_right_grip,
+            raw_right_grip - cur_right_grip,
+            cmd_right_grip - cur_right_grip,
+        )
 
     def _publish_joint(self, pub, position: np.ndarray, stamp: rospy.Time):
         msg = JointState()
@@ -542,6 +619,42 @@ def make_parser() -> argparse.ArgumentParser:
         help="Command guard profile.",
     )
     parser.add_argument(
+        "--guard-ema-alpha",
+        type=float,
+        default=None,
+        help="Override guard EMA alpha [0,1]. Defaults to selected --guard-profile value.",
+    )
+    parser.add_argument(
+        "--guard-max-joint-step",
+        type=float,
+        default=None,
+        help="Override max per-step delta for joints 1..6. Defaults to selected --guard-profile value.",
+    )
+    parser.add_argument(
+        "--guard-max-gripper-step",
+        type=float,
+        default=None,
+        help="Override max per-step delta for gripper. Defaults to selected --guard-profile value.",
+    )
+    parser.add_argument(
+        "--arm-action-mode",
+        choices=["absolute", "delta"],
+        default="absolute",
+        help="Interpret policy action dims 1..6 as absolute target positions or deltas on current state.",
+    )
+    parser.add_argument(
+        "--gripper-action-mode",
+        choices=["absolute", "delta"],
+        default="absolute",
+        help="Interpret policy gripper action dim as absolute target or delta on current state.",
+    )
+    parser.add_argument(
+        "--gripper-debug-interval-sec",
+        type=float,
+        default=0.0,
+        help="If >0, periodically log gripper raw/cmd/cur and deltas at this interval.",
+    )
+    parser.add_argument(
         "--enable-gripper",
         action="store_true",
         default=True,
@@ -603,6 +716,14 @@ def main():
         parser.error("--max-sync-delta-sec must be > 0")
     if args.startup_grace_sec < 0.0:
         parser.error("--startup-grace-sec must be >= 0")
+    if args.gripper_debug_interval_sec < 0.0:
+        parser.error("--gripper-debug-interval-sec must be >= 0")
+    if args.guard_ema_alpha is not None and not (0.0 <= args.guard_ema_alpha <= 1.0):
+        parser.error("--guard-ema-alpha must be in [0, 1]")
+    if args.guard_max_joint_step is not None and args.guard_max_joint_step <= 0.0:
+        parser.error("--guard-max-joint-step must be > 0")
+    if args.guard_max_gripper_step is not None and args.guard_max_gripper_step <= 0.0:
+        parser.error("--guard-max-gripper-step must be > 0")
 
     rospy.init_node("run_act_checkpoint_ros")
     node = PolicyPublisherNode(args)
