@@ -37,8 +37,13 @@ source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
 roslaunch robot_setup start_robot_all.launch \
   left_can_port:=can_sl right_can_port:=can_sr \
   opp_can_port:=can_opp enable_opp_arm:=true \
-  enable_cameras:=true enable_rviz:=true enable_handeye_tf:=true enable_fisheye:=false \
-  camera_left_usb_port:=2-2.2.1.4 camera_right_usb_port:=2-2.2.1.2 camera_top_usb_port:=2-2.2.1.3
+  enable_cameras:=true enable_rviz:=true enable_handeye_tf:=false enable_fisheye:=false \
+  camera_left_usb_port:=2-3.2  \
+  camera_top_usb_port:=2-3.3   \
+  camera_right_usb_port:=2-3.4 \
+  opp_camera_usb_port:= \
+  opp_camera_device:=/dev/wrist_opp_camera \
+  opp_camera_fourcc:=YUYV
 ```
 
 If cameras are not needed, set:
@@ -46,6 +51,20 @@ If cameras are not needed, set:
 ```bash
 enable_cameras:=false enable_rviz:=false enable_handeye_tf:=false
 ```
+
+OPP USB camera uses strict `YUYV` here. If the device cannot stream `YUYV`, the node keeps retrying `YUYV` and does not auto-switch to `MJPG`.
+
+One-time udev setup for stable OPP camera path:
+
+```bash
+bash /home/jameszhao2004/catkin_ws/workspaces/scripts/install_opp_camera_udev_rule.sh \
+  --device /dev/video18 \
+  --symlink wrist_opp_camera
+```
+
+If you still prefer USB-port pinning, set `opp_camera_usb_port:=1-4:1.0`. When this
+is set, the node treats that USB port as authoritative and refuses to fall back to
+another `/dev/videoN`.
 
 ## 4) Terminal C: Teleop side (must enable OPP gravity path)
 
@@ -105,6 +124,39 @@ Expected:
 
 If `enable_opp_arm` is `false` while launch arg was true, you likely launched the wrong `teleop_setup` package instance. Re-launch Terminal C using the absolute launch path shown above.
 
+OPP camera quick checks:
+
+```bash
+rostopic hz /wrist_opp/image_raw
+rostopic hz /wrist_opp/image_raw/compressed
+rosparam get /wrist_opp/opp_usb_camera_pub/active_fourcc
+```
+
+Expected:
+
+- `image_raw` and/or `image_raw/compressed` has non-zero Hz
+- `active_fourcc` is `YUYV`
+
+If the OPP camera still has no image, first identify the resolved `videoN` node from `bash find_all_camera_port.sh`, then check whether another process is holding it:
+
+```bash
+fuser -v /dev/video18
+```
+
+If you see `chrome`, browser video calls, webcam preview pages, or another capture app, close that process and relaunch the robot-side launch.
+
+For one-shot isolation testing, you can bypass USB-port resolution entirely and target the detected node directly:
+
+```bash
+opp_camera_usb_port:= opp_camera_device:=/dev/video18 opp_camera_fourcc:=YUYV
+```
+
+After installing the udev rule, prefer:
+
+```bash
+opp_camera_usb_port:= opp_camera_device:=/dev/wrist_opp_camera opp_camera_fourcc:=YUYV
+```
+
 ## 6) Terminal D: OPP keyboard switch
 
 ```bash
@@ -112,6 +164,13 @@ ros1
 source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
 python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/opp_master_switch.py
 ```
+
+source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
+python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/opp_master_switch.py \
+  --gravity-switch-align-lock-pre-hold-sec 0.18 \
+  --gravity-switch-calm-max-sec 1.2 \
+  --attach-switch-post-settle-sec 0.25
+
 
 Keys:
 
@@ -121,7 +180,73 @@ Keys:
 - `s`: print status
 - `q`: quit
 
-## 7) Terminal E: 3-arm intervention recorder
+## 7) Terminal E: Independent 3-Arm Switch Test (`1/2/H/F/Q`)
+
+Use this when you want to test intervention handover logic without touching recorder keybindings.
+
+```bash
+ros1
+source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
+python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/intervention_3arm_switch_test.py
+```
+
+Optional explicit policy command override:
+
+```bash
+python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/intervention_3arm_switch_test.py \
+  --policy-start-cmd "python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/run_act_checkpoint_ros.py --checkpoint-dir <ckpt_dir> --device cuda --rate 30 --temporal-ensemble-coeff 0.006 --guard-profile medium"
+```
+
+Keys:
+
+- `1`: `L->OPP`, `R->R`, `Left Hold`; stop policy
+- `2`: `L->L`, `R->OPP`, `Right Hold`; stop policy
+- `H`: `L->L`, `R->R`, `OPP Hold`; stop policy
+- `F`: restore auto policy (`L/R/OPP -> vla`) and restart policy
+- `S`: print current switch status
+- `Q`: stop policy, set all arms to hold, then quit
+
+Switch pipeline for `1/2/H`:
+
+- stop policy
+- pre-detach any current robot arm route consuming moving teleop masters (switch to hold first)
+- switch teleop feedback route (gravity + torque)
+- align teleop masters to target robot poses
+- apply final robot mux routes
+
+Feedback routing table (gravity + torque):
+
+- mode `1`: teleop-left feedback -> `opp`, teleop-right feedback -> `right`
+- mode `2`: teleop-left feedback -> `left`, teleop-right feedback -> `opp`
+- mode `H`: teleop-left feedback -> `left`, teleop-right feedback -> `right`
+- mode `F/Q/SAFE_HOLD`: restore defaults (`left/right`)
+
+Optional flags:
+
+```bash
+--disable-route-gravity-feedback
+--disable-route-torque-feedback
+--left-gravity-mux-service /teleop/arm_left/gravity_feedback_mux_select
+--right-gravity-mux-service /teleop/arm_right/gravity_feedback_mux_select
+--left-torque-mux-service /teleop/arm_left/torque_feedback_mux_select
+--right-torque-mux-service /teleop/arm_right/torque_feedback_mux_select
+```
+
+Quick checks:
+
+```bash
+rostopic echo /robot/arm_left/joint_cmd_mux/selected
+rostopic echo /robot/arm_right/joint_cmd_mux/selected
+rostopic echo /robot/arm_opp/joint_cmd_mux/selected
+rostopic echo /teleop/arm_left/gravity_feedback_mux/selected
+rostopic echo /teleop/arm_right/gravity_feedback_mux/selected
+rostopic echo /teleop/arm_left/torque_feedback_mux/selected
+rostopic echo /teleop/arm_right/torque_feedback_mux/selected
+rosnode list | grep run_act_checkpoint
+rostopic echo -n1 /conrft_robot/slave_follow_flag
+```
+
+## 8) Terminal F: 3-arm intervention recorder
 
 ```bash
 ros1
@@ -138,17 +263,50 @@ Keyboard:
 - `R`: resume
 - `Q`: quit safely
 
-## 8) Optional mode switch helpers
+## 9) Convert 3-arm rosbags to LeRobot
+
+Default (recommended): preserve full state+image overlap window, fill stale action with hold-last.
+
+```bash
+cd /home/jameszhao2004/training_codebase
+pipeline/scripts/convert_session_3arm.sh \
+  --session-dir /home/jameszhao2004/catkin_ws/data/rosbags/<session_name> \
+  --dataset-id <dataset_id> \
+  --fps 30 \
+  --dataset-version v30
+```
+
+Legacy strict behavior (old truncation style):
+
+```bash
+cd /home/jameszhao2004/training_codebase
+pipeline/scripts/convert_session_3arm.sh \
+  --session-dir /home/jameszhao2004/catkin_ws/data/rosbags/<session_name> \
+  --dataset-id <dataset_id> \
+  --fps 30 \
+  --dataset-version v30 \
+  -- \
+  --action-fill-policy strict_drop \
+  --teleop-left-topic /teleop/arm_left/joint_states_single \
+  --teleop-right-topic /teleop/arm_right/joint_states_single \
+  --opp-action-topic /robot/arm_opp/joint_cmd_mux
+```
+
+## 10) Optional mode switch helpers
 
 ```bash
 bash /home/jameszhao2004/catkin_ws/workspaces/scripts/set_teleop_mode.sh follow
 bash /home/jameszhao2004/catkin_ws/workspaces/scripts/set_teleop_mode.sh teleop
 ```
 
-## 9) Common failure signatures
+## 11) Common failure signatures
 
 - `No messages on /robot/arm_opp/joint_states_compensated`:
   teleop gravity node is not running with `enable_opp_arm=true`.
+- `Timeout waiting service /teleop/arm_*/gravity_feedback_mux_select`:
+  teleop feedback mux node not launched or namespace mismatch.
+- `Transition mode_* failed` right after mode key:
+  script auto-enters `SAFE_HOLD`; check feedback mux service names and OPP gravity topic readiness first.
 - `/piper_gravity_compensation_node/enable_opp_arm=False`:
   wrong teleop launch/package instance selected.
 - `CAN socket ... does not exist`:
@@ -156,7 +314,7 @@ bash /home/jameszhao2004/catkin_ws/workspaces/scripts/set_teleop_mode.sh teleop
 - `ERROR: Unable to communicate with master!`:
   ROS master not running.
 
-## 10) Related documents
+## 12) Related documents
 
 - Baseline 2-arm launch and troubleshooting:
   `/home/jameszhao2004/catkin_ws/workspaces/LAUNCH_RUNBOOK.md`

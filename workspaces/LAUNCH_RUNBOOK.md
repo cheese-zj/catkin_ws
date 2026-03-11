@@ -120,6 +120,22 @@ Check USB port mapping first:
 bash /home/jameszhao2004/catkin_ws/find_all_camera_port.sh
 ```
 
+Optional (for `enable_opp_camera:=true`): create a persistent OPP USB camera
+symlink once, then use it in launch args instead of `/dev/videoN`.
+
+```bash
+bash /home/jameszhao2004/catkin_ws/workspaces/scripts/install_opp_camera_udev_rule.sh \
+  --device /dev/video18 \
+  --symlink wrist_opp_camera
+```
+
+Then launch with:
+
+```bash
+opp_camera_usb_port:= \
+opp_camera_device:=/dev/wrist_opp_camera
+```
+
 ## 6) Quick Health Checks
 
 Run these after launch:

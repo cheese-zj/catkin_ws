@@ -58,10 +58,23 @@ ros1
 source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
 roslaunch robot_setup start_robot_all.launch \
   left_can_port:=can_sl right_can_port:=can_sr \
-  enable_opp_arm:=true \
-  enable_cameras:=true enable_rviz:=true enable_handeye_tf:=true enable_fisheye:=false \
-  camera_left_usb_port:=2-2.2.1.4 camera_right_usb_port:=2-2.2.1.2 camera_top_usb_port:=2-2.2.1.3
+  enable_opp_arm:=false \
+  enable_cameras:=true enable_opp_camera:=false \
+  enable_camera_left:=true enable_camera_right:=true enable_camera_top:=true \
+  enable_rviz:=true enable_handeye_tf:=false enable_fisheye:=false \
+  camera_initial_reset:=false \
+  camera_left_serial_no:=352122273242 \
+  camera_right_serial_no:=352122273590 \
+  camera_top_serial_no:=348522075799
+
 ```
+
+source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
+roslaunch robot_setup start_robot_all.launch \
+  left_can_port:=can_sl right_can_port:=can_sr \
+  enable_opp_arm:=false \
+  enable_cameras:=true enable_rviz:=true enable_handeye_tf:=false enable_fisheye:=false \
+  camera_left_usb_port:=2-3.2 camera_right_usb_port:=2-3.4 camera_top_usb_port:=2-3.3
 
 You should be able to see 
 - robot side arms return to $\vec{0}$ 
@@ -78,7 +91,7 @@ rospack find teleop_setup
 roslaunch /home/jameszhao2004/catkin_ws/src/zeno-wholebody-intervation/zeno-wholebody-teleop/teleop_side/teleop_setup/launch/start_teleop_all.launch \
   left_can_port:=can_ml right_can_port:=can_mr \
   enable_paddle:=false \
-  enable_opp_arm:=true \
+  enable_opp_arm:=false \
   master_slave_enable:=true mit_enable_tor:=true \
   mit_enable_pos:=true \
   mit_max_torque_abs:=8.0 \
@@ -116,6 +129,8 @@ source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
 rosparam get /piper_gravity_compensation_node/enable_opp_arm
 rostopic echo -n1 /robot/arm_opp/joint_states_compensated
 python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/opp_master_switch.py
+# optional: customize integrated recording session directory name
+python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/opp_master_switch.py --session-name my_session_001
 ```
 
 Keyboard:
@@ -125,6 +140,7 @@ Keyboard:
 - `q`: quit switcher
 
 `arm_opp` defaults to hold after startup. Press `1` or `2` to attach it to a master arm.
+Integrated recorder output root defaults to `/home/jameszhao2004/catkin_ws/data/rosbags`.
 
 #### Record ACT Rosbag Episodes
 
@@ -136,6 +152,7 @@ python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/record_act_keyboard_int
   --profile /home/jameszhao2004/catkin_ws/workspaces/config/rosbag_profiles/act_rgb_3arm_profile.yaml
 ```
 
+python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/record_act_keyboard.py
 
 Default behavior (no extra args):
 - profile: `workspaces/config/rosbag_profiles/act_rgb_profile.yaml`
@@ -182,6 +199,31 @@ pipeline/scripts/convert_session.sh \
   --task "bimanual teleop"
 ```
 
+### 3arm conversion (default: keep full state+image window, action hold-last)
+```bash
+cd /home/jameszhao2004/training_codebase
+pipeline/scripts/convert_session_3arm.sh \
+  --session-dir /home/jameszhao2004/catkin_ws/data/rosbags/3arm_open_bag \
+  --dataset-id 3arm_open_bag_v30_fps30_full \
+  --fps 30 \
+  --dataset-version v30
+```
+
+### 3arm conversion (legacy strict-drop behavior)
+```bash
+cd /home/jameszhao2004/training_codebase
+pipeline/scripts/convert_session_3arm.sh \
+  --session-dir /home/jameszhao2004/catkin_ws/data/rosbags/3arm_open_bag \
+  --dataset-id 3arm_open_bag_v30_fps30_strict \
+  --fps 30 \
+  --dataset-version v30 \
+  -- \
+  --action-fill-policy strict_drop \
+  --teleop-left-topic /teleop/arm_left/joint_states_single \
+  --teleop-right-topic /teleop/arm_right/joint_states_single \
+  --opp-action-topic /robot/arm_opp/joint_cmd_mux
+```
+
 ## Run Policy
 ```bash
 source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
@@ -191,7 +233,7 @@ rosservice call /robot/arm_left/joint_cmd_mux_select /robot/arm_left/vla_joint_c
 rosservice call /robot/arm_right/joint_cmd_mux_select /robot/arm_right/vla_joint_cmd
 
 OUT_ROOT=/home/jameszhao2004/training_codebase/outputs/train
-RUN_NAME=pick_place_out_of_view_new_40_merged_with_intervention_teleop_v30_fps30_local_20260304_001139
+RUN_NAME=Simulation_lyj
 CKPT_STEP=080000
 
 OUT_ROOT=/home/jameszhao2004/training_codebase/outputs/train
@@ -201,7 +243,7 @@ CKPT_STEP=060000
 python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/run_act_checkpoint_ros.py \
   --checkpoint-dir ${OUT_ROOT}/${RUN_NAME}/checkpoints/${CKPT_STEP}/pretrained_model/ \
   --device cuda \
-  --rate 30 \
+  --rate 15 \
   --temporal-ensemble-coeff 0.01 \
   --guard-profile medium \
   --debug-streams
@@ -279,3 +321,15 @@ rostopic pub --once /conrft_robot/slave_follow_flag std_msgs/Bool "data: false"
 echo "[B] 只调 enable，不切 follow flag"
 rosservice call /teleop/arm_left/enable_srv "enable_request: true"
 rosservice call /teleop/arm_right/enable_srv "enable_request: true"
+
+
+source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
+
+for t in \
+  /realsense_left/color/camera_info \
+  /realsense_right/color/camera_info \
+  /realsense_top/color/camera_info
+do
+  echo "===== $t ====="
+  rostopic echo -n1 "$t" | egrep "^(width|height|distortion_model|D:|K:|R:|P:)"
+done

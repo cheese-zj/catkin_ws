@@ -42,6 +42,18 @@ Visualization Manager:
       Transport Hint: compressed
       Unreliable: false
       Value: true
+    - Class: rviz/Image
+      Enabled: true
+      Image Topic: /wrist_opp/image_raw
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: OPP_Cam
+      Normalize Range: true
+      Queue Size: 2
+      Transport Hint: compressed
+      Unreliable: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -99,6 +111,8 @@ Window Geometry:
   Wrist_Right:
     collapsed: false
   Overhead:
+    collapsed: false
+  OPP_Cam:
     collapsed: false
   Width: 2488
   X: 72

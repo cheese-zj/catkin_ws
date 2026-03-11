@@ -28,6 +28,7 @@
     <node pkg="topic_tools" type="mux" name="mux_arm_left_joint"
           args="/robot/arm_left/joint_cmd_mux
                 /robot/arm_left/vla_joint_cmd
+                /robot/arm_left/hold_joint_cmd
                 /teleop/arm_left/joint_states_single"
           output="screen">
         <param name="~default" value="/teleop/arm_left/joint_states_single" /> 
@@ -47,6 +48,7 @@
     <node pkg="topic_tools" type="mux" name="mux_arm_right_joint"
           args="/robot/arm_right/joint_cmd_mux
                 /robot/arm_right/vla_joint_cmd
+                /robot/arm_right/hold_joint_cmd
                 /teleop/arm_right/joint_states_single"
           output="screen">
         <param name="~default" value="/teleop/arm_right/joint_states_single"/>

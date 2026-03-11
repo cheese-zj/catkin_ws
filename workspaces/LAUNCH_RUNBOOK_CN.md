@@ -166,6 +166,22 @@ roslaunch robot_setup start_robot_all.launch \
 bash /home/jameszhao2004/catkin_ws/find_all_camera_port.sh
 ```
 
+可选（当 `enable_opp_camera:=true` 时推荐）：一次性创建 OPP USB 相机
+稳定设备名，避免 `/dev/videoN` 漂移。
+
+```bash
+bash /home/jameszhao2004/catkin_ws/workspaces/scripts/install_opp_camera_udev_rule.sh \
+  --device /dev/video18 \
+  --symlink wrist_opp_camera
+```
+
+随后启动时使用：
+
+```bash
+opp_camera_usb_port:= \
+opp_camera_device:=/dev/wrist_opp_camera
+```
+
 ## 6) 快速健康检查
 
 启动后执行：

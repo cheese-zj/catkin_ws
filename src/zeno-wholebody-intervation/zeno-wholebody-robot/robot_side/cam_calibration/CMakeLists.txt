@@ -11,9 +11,10 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   roscpp
   rospy
-  std_msgs
-  sensor_msgs
   cv_bridge
+  sensor_msgs
+  std_msgs
+  std_srvs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -163,8 +164,13 @@ include_directories(
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
+  scripts/calibration.py
   scripts/detect_target.py
+  scripts/detect_apriltag_target.py
   scripts/depth_test.py
+  scripts/tf_publisher.py
+  scripts/wrist_handeye_calibration.py
+  scripts/wrist_handeye_gui.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

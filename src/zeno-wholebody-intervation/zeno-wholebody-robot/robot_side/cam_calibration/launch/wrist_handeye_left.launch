@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="image_topic" default="/realsense_left/color/image_raw" />
+    <arg name="camera_info_topic" default="/realsense_left/color/camera_info" />
+    <arg name="target_pose_topic" default="/handeye/left_cam_from_tag" />
+    <arg name="end_pose_topic" default="/robot/arm_left/end_pose" />
+    <arg name="tag_family" default="tag36h11" />
+    <arg name="tag_id" default="0" />
+    <arg name="tag_size_m" default="0.10" />
+    <arg name="show_visualization" default="true" />
+    <arg name="min_samples" default="30" />
+    <arg name="method" default="PARK" />
+
+    <node name="left_detect_apriltag_target" pkg="cam_calibration" type="detect_apriltag_target.py" output="screen">
+        <param name="image_topic" value="$(arg image_topic)" />
+        <param name="camera_info_topic" value="$(arg camera_info_topic)" />
+        <param name="target_pose_topic" value="$(arg target_pose_topic)" />
+        <param name="tag_family" value="$(arg tag_family)" />
+        <param name="tag_id" value="$(arg tag_id)" />
+        <param name="tag_size_m" value="$(arg tag_size_m)" />
+        <param name="show_visualization" value="$(arg show_visualization)" />
+        <param name="window_name" value="Left Wrist AprilTag Detection" />
+    </node>
+
+    <node name="left_wrist_handeye_calibration" pkg="cam_calibration" type="wrist_handeye_calibration.py" output="screen">
+        <param name="end_pose_topic" value="$(arg end_pose_topic)" />
+        <param name="target_pose_topic" value="$(arg target_pose_topic)" />
+        <param name="parent_frame" value="arm_left/gripper_base" />
+        <param name="child_frame" value="realsense_left_color_optical_frame" />
+        <param name="samples_dir" value="$(find cam_calibration)/data/samples/left" />
+        <param name="tag_family" value="$(arg tag_family)" />
+        <param name="tag_id" value="$(arg tag_id)" />
+        <param name="tag_size_m" value="$(arg tag_size_m)" />
+        <param name="min_samples" value="$(arg min_samples)" />
+        <param name="method" value="$(arg method)" />
+    </node>
+</launch>

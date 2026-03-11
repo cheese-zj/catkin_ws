@@ -1,23 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-发布标定结果的 TF。
+"""Publish wrist and optional top-camera calibration TFs."""
 
-当前读取 handeye_data_*.json 中的 R_gripper2left / t_gripper2left
-以及 R_base2top / t_base2top，并分别发布 TF：
-- gripper -> left camera
-- base   -> top camera
-
-逻辑：
-1. 自动查找 samples 目录下最新的标定文件（文件名含时间戳 handeye_data_YYYYMMDD_HHMMSS.json）。
-2. 读取矩阵并转换为平移 + 四元数。
-3. 持续发布 TF。
-"""
+from __future__ import annotations
 
 import os
 import json
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import rospy
@@ -28,17 +18,32 @@ from tf.transformations import quaternion_from_matrix
 
 
 def _extract_timestamp(filename: str) -> datetime:
-    """从文件名 handeye_data_YYYYMMDD_HHMMSS.json 提取时间戳，解析失败返回最小时间。"""
+    """Extract a timestamp from known calibration filenames."""
     try:
-        if filename.startswith("handeye_data_") and filename.endswith(".json"):
-            ts_str = filename[len("handeye_data_") : -len(".json")]
-            if "_" in ts_str:
-                date_part, time_part = ts_str.split("_", 1)
-                if len(date_part) == 8 and len(time_part) == 6:
-                    return datetime.strptime(ts_str, "%Y%m%d_%H%M%S")
+        if filename.endswith(".json"):
+            for prefix in ("handeye_axxb_", "handeye_data_"):
+                if filename.startswith(prefix):
+                    ts_str = filename[len(prefix) : -len(".json")]
+                    if "_" in ts_str:
+                        date_part, time_part = ts_str.split("_", 1)
+                        if len(date_part) == 8 and len(time_part) == 6:
+                            return datetime.strptime(ts_str, "%Y%m%d_%H%M%S")
     except Exception:
         pass
     return datetime.min
+
+
+def get_wrist_transform_keys(data: Dict) -> Tuple[str, str]:
+    """Resolve wrist transform keys while keeping legacy sample files readable."""
+    candidates = (
+        ("R_gripper2cam", "t_gripper2cam"),
+        ("R_gripper2left", "t_gripper2left"),
+        ("R_gripper2right", "t_gripper2right"),
+    )
+    for R_key, t_key in candidates:
+        if R_key in data and t_key in data:
+            return R_key, t_key
+    raise KeyError("Missing wrist transform keys in calibration file")
 
 
 class GripperCamTFPublisher:
@@ -72,7 +77,7 @@ class GripperCamTFPublisher:
         self.br = tf2_ros.TransformBroadcaster()
 
     def _find_latest_file(self) -> Optional[str]:
-        """根据文件名中的时间戳选择最新的 handeye_data_*.json。"""
+        """Choose the newest supported calibration JSON file in samples_dir."""
         try:
             candidates = [
                 f
@@ -151,11 +156,12 @@ class GripperCamTFPublisher:
 
         if self.publish_wrist:
             try:
+                wrist_R_key, wrist_t_key = get_wrist_transform_keys(data)
                 transforms.append(
                     self._build_transform(
                         data,
-                        "R_gripper2cam",
-                        "t_gripper2cam",
+                        wrist_R_key,
+                        wrist_t_key,
                         self.parent_frame,
                         self.child_frame,
                         self.wrist_reverse,

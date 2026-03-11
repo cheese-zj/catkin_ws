@@ -10,6 +10,7 @@ import time
 import threading
 import math
 import numpy as np
+import traceback
 from piper_sdk import *
 from piper_sdk import C_PiperInterface
 from std_srvs.srv import Trigger, TriggerResponse
@@ -1497,3 +1498,8 @@ if __name__ == "__main__":
         node.Run()
     except rospy.ROSInterruptException:
         pass
+    except Exception as exc:
+        # Keep full traceback in ROS logs to avoid "silent exit code 1" failures.
+        rospy.logfatal("piper_ctrl_node startup failed: %s", str(exc))
+        rospy.logfatal(traceback.format_exc())
+        raise

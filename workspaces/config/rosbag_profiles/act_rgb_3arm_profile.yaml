@@ -5,6 +5,7 @@ camera_transport: compressed
 # - /realsense_left  => left wrist camera
 # - /realsense_right => right wrist camera
 # - /realsense_top   => overhead camera
+# - /wrist_opp       => opp wrist usb camera
 
 required_topics:
   - /robot/arm_left/joint_states_single
@@ -43,6 +44,8 @@ camera_streams:
     camera_info: /realsense_right/color/camera_info
   - image_base: /realsense_top/color/image_raw
     camera_info: /realsense_top/color/camera_info
+  - image_base: /wrist_opp/image_raw
+    camera_info: /wrist_opp/camera_info
 
 optional_topics:
   - /conrft_robot/slave_follow_flag
@@ -65,3 +68,4 @@ hz_monitor_topics:
   - /realsense_left/color/image_raw
   - /realsense_right/color/image_raw
   - /realsense_top/color/image_raw
+  - /wrist_opp/image_raw

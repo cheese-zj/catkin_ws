@@ -47,6 +47,9 @@ if(NOT realsense2_FOUND)
     message(FATAL_ERROR "\n\n Intel RealSense SDK 2.0 is missing, please install it from https://github.com/IntelRealSense/librealsense/releases\n\n")
 endif()
 
+message(STATUS "Using RealSense include dir: ${realsense2_INCLUDE_DIR}")
+message(STATUS "Using RealSense library: ${realsense2_LIBRARY}")
+
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
@@ -123,6 +126,15 @@ target_link_libraries(${PROJECT_NAME}
     ${CMAKE_THREAD_LIBS_INIT}
     )
 
+if(NOT WIN32)
+get_filename_component(REALSENSE2_LIB_DIR "${realsense2_LIBRARY}" DIRECTORY)
+if(REALSENSE2_LIB_DIR)
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        BUILD_RPATH "${REALSENSE2_LIB_DIR}"
+        INSTALL_RPATH "${REALSENSE2_LIB_DIR}")
+endif()
+endif()
+
 if(WIN32)
 set_target_properties(${realsense2_LIBRARY} PROPERTIES MAP_IMPORTED_CONFIG_RELWITHDEBINFO RELEASE)
 target_link_libraries(${PROJECT_NAME}
@@ -158,4 +170,3 @@ install(DIRECTORY rviz/
 install(FILES nodelet_plugins.xml
     DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
     )
-

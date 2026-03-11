@@ -40,3 +40,6 @@ echo "Use the /dev/v4l/by-id/... path in launch args for stable camera assignmen
 echo "  roslaunch piper_teleop teleop_collect.launch \\"
 echo "      wrist_left_device:=/dev/v4l/by-id/<left_cam> \\"
 echo "      wrist_right_device:=/dev/v4l/by-id/<right_cam>"
+echo
+echo "For OPP USB cam stable /dev name, generate a udev symlink once:"
+echo "  bash /home/jameszhao2004/catkin_ws/workspaces/scripts/install_opp_camera_udev_rule.sh --device /dev/videoN --symlink wrist_opp_camera"
