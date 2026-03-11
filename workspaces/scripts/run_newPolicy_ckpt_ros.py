@@ -185,7 +185,22 @@ class PolicyPublisherNode:
 
         rospy.loginfo("Loading ACT policy from: %s", ckpt)
         # policy = ACTPolicy.from_pretrained(str(ckpt), local_files_only=True, cli_overrides=cli_overrides)
-        policy = ACTTemporalPolicy.from_pretrained(str(ckpt), local_files_only=True, cli_overrides=cli_overrides)
+        # policy = ACTTemporalPolicy.from_pretrained(str(ckpt), local_files_only=True, cli_overrides=cli_overrides)
+        if self.args.policy_type == "act":
+            policy = ACTPolicy.from_pretrained(
+                str(ckpt),
+                local_files_only=True,
+                cli_overrides=cli_overrides,
+            )
+        elif self.args.policy_type == "act-temporal":
+            policy = ACTTemporalPolicy.from_pretrained(
+                str(ckpt),
+                local_files_only=True,
+                cli_overrides=cli_overrides,
+            )
+        else:
+            raise RuntimeError(f"Unsupported policy type: {self.args.policy_type}")
+
         preprocessor, postprocessor = make_pre_post_processors(
             policy.config,
             pretrained_path=str(ckpt),
