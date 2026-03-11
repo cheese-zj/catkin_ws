@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="image_topic" default="/realsense_right/color/image_raw" />
+    <arg name="target_pose_topic" default="/handeye/right_cam_from_tag" />
+    <arg name="calibrator_ns" default="/right_wrist_handeye_calibration" />
+    <arg name="min_samples" default="30" />
+    <arg name="preview_scale" default="1.0" />
+    <arg name="status_poll_hz" default="2.0" />
+
+    <node name="right_wrist_handeye_gui" pkg="cam_calibration" type="wrist_handeye_gui.py" output="screen">
+        <param name="side" value="right" />
+        <param name="image_topic" value="$(arg image_topic)" />
+        <param name="target_pose_topic" value="$(arg target_pose_topic)" />
+        <param name="calibrator_ns" value="$(arg calibrator_ns)" />
+        <param name="min_samples" value="$(arg min_samples)" />
+        <param name="preview_scale" value="$(arg preview_scale)" />
+        <param name="status_poll_hz" value="$(arg status_poll_hz)" />
+        <param name="window_name" value="Wrist HandEye GUI (right)" />
+    </node>
+</launch>

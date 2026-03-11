@@ -3,18 +3,51 @@
     <arg name="ranger_can_port" default="can0" />
     <arg name="left_can_port" default="can_left" />
     <arg name="right_can_port" default="can_right" />
+    <arg name="opp_can_port" default="can_opp" />
 
     <!-- Arguments for dual-arm control -->
     <arg name="enable_dual_arm" default="true" />
+    <arg name="enable_opp_arm" default="false" />
     <arg name="auto_enable" default="true" />
     <arg name="gripper_val_mutiple" default="2" />
     <arg name="girpper_exist" default="true" />
+    <arg name="enforce_joint_limits" default="true" />
 
     <!-- Arguments for cameras -->
     <arg name="enable_cameras" default="true" />
+    <arg name="enable_camera_left" default="true" />
+    <arg name="enable_camera_right" default="true" />
+    <arg name="enable_camera_top" default="true" />
     <arg name="camera_left_usb_port" default="2-2.2.1.4" />
     <arg name="camera_right_usb_port" default="2-2.2.1.2" />
     <arg name="camera_top_usb_port" default="2-2.2.1.3" />
+    <arg name="camera_left_serial_no" default="" />
+    <arg name="camera_right_serial_no" default="" />
+    <arg name="camera_top_serial_no" default="" />
+    <arg name="camera_initial_reset" default="false" />
+    <arg name="camera_left_color_fps" default="30" />
+    <arg name="camera_right_color_fps" default="30" />
+    <arg name="camera_top_color_fps" default="30" />
+    <arg name="camera_top_enable_depth" default="true" />
+    <arg name="camera_top_depth_fps" default="-1" />
+    <arg name="camera_top_enable_confidence" default="true" />
+    <arg name="camera_top_confidence_fps" default="-1" />
+    <arg name="enable_opp_camera" default="true" />
+    <arg name="opp_camera_usb_port" default="" />
+    <arg name="opp_camera_device" default="/dev/video0" />
+    <arg name="opp_camera_frame_id" default="wrist_opp_camera_optical_frame" />
+    <arg name="opp_camera_width" default="640" />
+    <arg name="opp_camera_height" default="480" />
+    <arg name="opp_camera_fps" default="30" />
+    <arg name="opp_camera_fourcc" default="MJPG" />
+    <arg name="opp_camera_output_encoding" default="bgr8" />
+    <arg name="opp_camera_capture_backend" default="v4l2" />
+    <arg name="opp_camera_gstreamer_pipeline" default="" />
+    <arg name="opp_camera_flip_horizontal" default="false" />
+    <arg name="opp_camera_flip_vertical" default="false" />
+    <arg name="opp_camera_publish_raw" default="true" />
+    <arg name="opp_camera_publish_compressed" default="true" />
+    <arg name="opp_camera_jpeg_quality" default="85" />
     <arg name="enable_rviz" default="true" />
     <arg name="use_default_rviz" default="true" />
     <arg name="enable_handeye_tf" default="true" />
@@ -34,52 +67,97 @@
     <!-- Launch dual-arm control node -->
     <!-- Note: Parameters (can_port, topic_prefix, remap) are configured in piper_dual.yaml -->
     <group if="$(arg enable_dual_arm)">
-        <include file="$(find piper_ctrl)/launch/piper_dual_robot.launch" />
+        <include file="$(find piper_ctrl)/launch/piper_dual_robot.launch">
+            <arg name="enforce_joint_limits" value="$(arg enforce_joint_limits)" />
+            <arg name="enable_opp_arm" value="$(arg enable_opp_arm)" />
+            <arg name="left_can_port" value="$(arg left_can_port)" />
+            <arg name="right_can_port" value="$(arg right_can_port)" />
+            <arg name="opp_can_port" value="$(arg opp_can_port)" />
+        </include>
     </group>
 
     <!-- Launch lab RealSense camera stack: D405 left/right wrists + D435 overhead -->
     <group if="$(arg enable_cameras)">
-        <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+        <include if="$(arg enable_camera_left)" file="$(find realsense2_camera)/launch/rs_camera.launch">
             <arg name="camera" value="realsense_left" />
-            <arg name="usb_port_id" value="$(arg camera_left_usb_port)" />
+            <arg name="serial_no" value="$(arg camera_left_serial_no)" />
+            <arg name="usb_port_id" value="$(eval '' if arg('camera_left_serial_no') else arg('camera_left_usb_port'))" />
+            <arg name="initial_reset" value="$(arg camera_initial_reset)" />
             <arg name="enable_color" value="true" />
             <arg name="color_width" value="640" />
             <arg name="color_height" value="480" />
-            <arg name="color_fps" value="30" />
+            <arg name="color_fps" value="$(arg camera_left_color_fps)" />
             <arg name="enable_depth" value="false" />
-            <arg name="enable_infra1" value="true" />
-            <arg name="enable_infra2" value="false" />
-            <arg name="enable_pointcloud" value="false" />
-            <arg name="align_depth" value="false" />
-        </include>
-
-        <include file="$(find realsense2_camera)/launch/rs_camera.launch">
-            <arg name="camera" value="realsense_right" />
-            <arg name="usb_port_id" value="$(arg camera_right_usb_port)" />
-            <arg name="enable_color" value="true" />
-            <arg name="color_width" value="640" />
-            <arg name="color_height" value="480" />
-            <arg name="color_fps" value="30" />
-            <arg name="enable_depth" value="false" />
-            <arg name="enable_infra1" value="true" />
-            <arg name="enable_infra2" value="false" />
-            <arg name="enable_pointcloud" value="false" />
-            <arg name="align_depth" value="false" />
-        </include>
-
-        <include file="$(find realsense2_camera)/launch/rs_camera.launch">
-            <arg name="camera" value="realsense_top" />
-            <arg name="usb_port_id" value="$(arg camera_top_usb_port)" />
-            <arg name="enable_color" value="true" />
-            <arg name="color_width" value="848" />
-            <arg name="color_height" value="480" />
-            <arg name="color_fps" value="30" />
-            <arg name="enable_depth" value="false" />
+            <arg name="enable_confidence" value="false" />
             <arg name="enable_infra1" value="false" />
             <arg name="enable_infra2" value="false" />
             <arg name="enable_pointcloud" value="false" />
             <arg name="align_depth" value="false" />
         </include>
+
+        <include if="$(arg enable_camera_right)" file="$(find realsense2_camera)/launch/rs_camera.launch">
+            <arg name="camera" value="realsense_right" />
+            <arg name="serial_no" value="$(arg camera_right_serial_no)" />
+            <arg name="usb_port_id" value="$(eval '' if arg('camera_right_serial_no') else arg('camera_right_usb_port'))" />
+            <arg name="initial_reset" value="$(arg camera_initial_reset)" />
+            <arg name="enable_color" value="true" />
+            <arg name="color_width" value="640" />
+            <arg name="color_height" value="480" />
+            <arg name="color_fps" value="$(arg camera_right_color_fps)" />
+            <arg name="enable_depth" value="false" />
+            <arg name="enable_confidence" value="false" />
+            <arg name="enable_infra1" value="false" />
+            <arg name="enable_infra2" value="false" />
+            <arg name="enable_pointcloud" value="false" />
+            <arg name="align_depth" value="false" />
+        </include>
+
+        <include if="$(arg enable_camera_top)" file="$(find realsense2_camera)/launch/rs_camera.launch">
+            <arg name="camera" value="realsense_top" />
+            <arg name="serial_no" value="$(arg camera_top_serial_no)" />
+            <arg name="usb_port_id" value="$(eval '' if arg('camera_top_serial_no') else arg('camera_top_usb_port'))" />
+            <arg name="initial_reset" value="$(arg camera_initial_reset)" />
+            <arg name="enable_color" value="true" />
+            <arg name="color_width" value="640" />
+            <arg name="color_height" value="480" />
+            <arg name="color_fps" value="$(arg camera_top_color_fps)" />
+            <arg name="enable_depth" value="$(arg camera_top_enable_depth)" />
+            <arg name="depth_fps" value="$(arg camera_top_depth_fps)" />
+            <arg name="enable_confidence" value="$(arg camera_top_enable_confidence)" />
+            <arg name="confidence_fps" value="$(arg camera_top_confidence_fps)" />
+            <arg name="enable_infra1" value="false" />
+            <arg name="enable_infra2" value="false" />
+            <arg name="enable_pointcloud" value="false" />
+            <arg name="align_depth" value="false" />
+        </include>
+
+        <node
+            if="$(arg enable_opp_camera)"
+            name="opp_usb_camera_pub"
+            ns="wrist_opp"
+            pkg="robot_setup"
+            type="opp_usb_camera_pub.py"
+            output="screen"
+            respawn="true"
+            respawn_delay="2.0">
+            <param name="usb_port" value="$(arg opp_camera_usb_port)" />
+            <param name="device" value="$(arg opp_camera_device)" />
+            <param name="frame_id" value="$(arg opp_camera_frame_id)" />
+            <param name="width" value="$(arg opp_camera_width)" />
+            <param name="height" value="$(arg opp_camera_height)" />
+            <param name="fps" value="$(arg opp_camera_fps)" />
+            <param name="fourcc" value="$(arg opp_camera_fourcc)" />
+            <param name="output_encoding" value="$(arg opp_camera_output_encoding)" />
+            <param name="capture_backend" value="$(arg opp_camera_capture_backend)" />
+            <param name="gstreamer_pipeline" value="$(arg opp_camera_gstreamer_pipeline)" />
+            <param name="flip_horizontal" value="$(arg opp_camera_flip_horizontal)" />
+            <param name="flip_vertical" value="$(arg opp_camera_flip_vertical)" />
+            <param name="publish_camera_info" value="true" />
+            <param name="publish_raw" value="$(arg opp_camera_publish_raw)" />
+            <param name="publish_compressed" value="$(arg opp_camera_publish_compressed)" />
+            <param name="jpeg_quality" value="$(arg opp_camera_jpeg_quality)" />
+            <param name="reconnect_sec" value="1.0" />
+        </node>
     </group>
     
     <!-- FishEye stereo (hand cameras replacement) -->
@@ -99,7 +177,12 @@
                 <node name="rviz" pkg="rviz" type="rviz" args="-d $(find robot_setup)/rviz/dual_basic_fisheye.rviz" output="screen" />
             </group>
             <group unless="$(arg enable_fisheye)">
-                <node name="rviz" pkg="rviz" type="rviz" args="-d $(find robot_setup)/rviz/dual_basic.rviz" output="screen" />
+                <group if="$(arg enable_opp_arm)">
+                    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find robot_setup)/rviz/dual_basic.rviz" output="screen" />
+                </group>
+                <group unless="$(arg enable_opp_arm)">
+                    <node name="rviz" pkg="rviz" type="rviz" args="-d $(find robot_setup)/rviz/dual_basic_no_opp.rviz" output="screen" />
+                </group>
             </group>
         </group>
         <group unless="$(arg use_default_rviz)">

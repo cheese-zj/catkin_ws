@@ -81,7 +81,7 @@ Visualization Manager:
       Name: Fisheye_left
       Normalize Range: true
       Queue Size: 2
-      Transport Hint: raw
+      Transport Hint: compressed
       Unreliable: false
       Value: true
     - Class: rviz/Image
@@ -93,7 +93,7 @@ Visualization Manager:
       Name: Fisheye_right
       Normalize Range: true
       Queue Size: 2
-      Transport Hint: raw
+      Transport Hint: compressed
       Unreliable: false
       Value: true
     - Class: rviz/Image
@@ -105,7 +105,7 @@ Visualization Manager:
       Name: Wide_top
       Normalize Range: true
       Queue Size: 2
-      Transport Hint: raw
+      Transport Hint: compressed
       Unreliable: false
       Value: true
     - Class: rviz/Image
@@ -117,7 +117,7 @@ Visualization Manager:
       Name: Image
       Normalize Range: true
       Queue Size: 2
-      Transport Hint: raw
+      Transport Hint: compressed
       Unreliable: false
       Value: false
     - Class: rviz/Image

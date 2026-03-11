@@ -1,14 +1,18 @@
+> [!WARNING]
+> Deprecated workflow note (2026-02-23): do not use catkin_ws as a training entrypoint.
+> Canonical training + policy storage is `/home/jameszhao2004/training_codebase/outputs/train`.
+> Preferred commands:
+> - `bash /home/jameszhao2004/training_codebase/pipeline/scripts/trainctl.sh start ...`
+> - `bash /home/jameszhao2004/training_codebase/pipeline/scripts/trainctl.sh policy --run-name <run_name> --step best`
 
 ## switch
 
-robot -> fake policy
+robot controlled by policy
 rosservice call /robot/arm_left/joint_cmd_mux_select /robot/arm_left/vla_joint_cmd
 rosservice call /robot/arm_right/joint_cmd_mux_select /robot/arm_right/vla_joint_cmd
 
-
 teleop -> follow
 bash /home/jameszhao2004/catkin_ws/workspaces/scripts/set_teleop_mode.sh follow
-
 
 teleop -> free
 bash /home/jameszhao2004/catkin_ws/workspaces/scripts/set_teleop_mode.sh teleop
@@ -49,10 +53,10 @@ roslaunch teleop_setup start_teleop_all.launch \
 
 
 ## videos in rosbag -> mp4
-python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/unpack_bag_videos.py --bag /home/jameszhao2004/catkin_ws/data/rosbags/act_20260222_210318/episode_003/episode.bag --output-dir /home/jameszhao2004/catkin_ws/data/rosbags/act_20260222_210318/episode_003/episode_videos_mp4  --codec mp4v   --container mp4
+python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/unpack_bag_videos.py --bag /home/jameszhao2004/catkin_ws/data/rosbags/pick&place(out of view) new 100/episode_001/episode.bag --output-dir /home/jameszhao2004/catkin_ws/data/rosbags/pick&place(outof view) new 100/episode_001/episode_videos_mp4  --codec mp4v   --container mp4
 
 
-## train
+## train history (DEPRECATED: do not run here; use training_codebase/pipeline/scripts/trainctl.sh)
 source /home/jameszhao2004/catkin_ws/.venv_train_act/bin/activate
 
 DATASET_ID=act_20260222_210318_v21_fps30
@@ -60,6 +64,7 @@ DATASET_PARENT=/home/jameszhao2004/training_codebase/data/lerobot
 RUN_NAME=act_20260222_210318_chunk100_obs1_100k_bs8_amp
 OUT_DIR=/home/jameszhao2004/training_codebase/outputs/train/${RUN_NAME}
 
+# HISTORICAL COMMAND (DO NOT RUN): replaced by training_codebase/pipeline/scripts/trainctl.sh
 CUDA_VISIBLE_DEVICES=0 lerobot-train \
   --dataset.repo_id ${DATASET_ID} \
   --dataset.root ${DATASET_PARENT}/${DATASET_ID} \
@@ -81,8 +86,6 @@ CUDA_VISIBLE_DEVICES=0 lerobot-train \
   --output_dir ${OUT_DIR} \
   --resume true
 
-
-
 # run policy:
 
 CKPT_STEP=088000
@@ -94,17 +97,18 @@ python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/run_act_checkpoint_ros.
   --guard-profile medium \
   --debug-streams
 
-
-
 # Train (ACT, chunk=100, n_action_steps=100, n_obs_steps=1)
 source /home/jameszhao2004/catkin_ws/.venv_train_act/bin/activate
 
 # Upgrade an existing local v2.1 dataset to v3.0 in-place (required by lerobot>=v3 format)
+source /home/jameszhao2004/catkin_ws/.venv_train_act/bin/activate
+
 python -m lerobot.datasets.v30.convert_dataset_v21_to_v30 \
-  --repo-id act_20260220_220456_v21_fps30 \
-  --root /home/jameszhao2004/catkin_ws/data/lerobot \
+  --repo-id jinhe \
+  --root /home/jameszhao2004/training_codebase/data/lerobot \
   --push-to-hub false
 
+# HISTORICAL COMMAND (DO NOT RUN): replaced by training_codebase/pipeline/scripts/trainctl.sh
 CUDA_VISIBLE_DEVICES=0 lerobot-train \
   --dataset.repo_id act_20260220_220456_v21_fps30 \
   --dataset.root /home/jameszhao2004/catkin_ws/data/lerobot/act_20260220_220456_v21_fps30 \
@@ -123,7 +127,7 @@ CUDA_VISIBLE_DEVICES=0 lerobot-train \
   --batch_size 8 \
   --num_workers 4 \
   --wandb.mode disabled \
-  --output_dir /home/jameszhao2004/catkin_ws/outputs/train/act_20260218_192753_chunk60_obs1_100k_bs4_amp
+  --output_dir /home/jameszhao2004/training_codebase/outputs/train/act_20260218_192753_chunk60_obs1_100k_bs4_amp
 
 
 # new can setup
@@ -147,17 +151,46 @@ wrist_cam_l = 2-2.2.1.4
 overhead_cam = 2-2.2.1.3
 face_cam = 1-2.1
 
-
 # load policy
 
-OUT_ROOT=/home/jameszhao2004/catkin_ws/outputs/train
-RUN_NAME=act_20260222_210318_chunk100_obs1_100k_bs8_amp_ft
-CKPT_STEP=050000
+## robot controlled by policy
+rosservice call /robot/arm_left/joint_cmd_mux_select /robot/arm_left/vla_joint_cmd
+rosservice call /robot/arm_right/joint_cmd_mux_select /robot/arm_right/vla_joint_cmd
+
+OUT_ROOT=/home/jameszhao2004/training_codebase/outputs/train
+RUN_NAME=towel_folding_260224_act_v30_fps30_local_20260225_034326_chunk80
+CKPT_STEP=030000
 
 python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/run_act_checkpoint_ros.py \
   --checkpoint-dir ${OUT_ROOT}/${RUN_NAME}/checkpoints/${CKPT_STEP}/pretrained_model/ \
   --device cuda \
   --rate 30 \
-  --temporal-ensemble-coeff 0.002 \
+  --temporal-ensemble-coeff 0.01 \
   --guard-profile medium \
   --debug-streams
+
+
+# replay
+
+# Terminal B (replay one episode to real arms)
+source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
+
+SESSION=/home/jameszhao2004/catkin_ws/data/rosbags/act_20260220_220456
+EP=30
+printf -v EP3 "%03d" "$EP"
+BAG="${SESSION}/episode_${EP3}/episode.bag"
+
+rosbag play "$BAG" --pause --rate 1.0 --topics \
+  /teleop/arm_left/joint_states_single \
+  /teleop/arm_right/joint_states_single \
+  /teleop/arm_left/joint_states_single:=/robot/arm_left/vla_joint_cmd \
+  /teleop/arm_right/joint_states_single:=/robot/arm_right/vla_joint_cmd
+
+
+
+
+
+
+
+
+

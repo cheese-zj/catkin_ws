@@ -10,6 +10,7 @@ import time
 import threading
 import math
 import numpy as np
+import traceback
 from piper_sdk import *
 from piper_sdk import C_PiperInterface
 from std_srvs.srv import Trigger, TriggerResponse
@@ -120,6 +121,11 @@ class C_PiperCtrlNode:
         self.gripper_haptic_cmd_enable_threshold = max(
             0, min(self.gripper_haptic_cmd_enable_threshold, self.gripper_haptic_cmd_max)
         )
+        # Keep teleop haptic behavior unchanged, but allow reliable robot->teleop
+        # follow by bypassing haptic gating only in slave-follow mode.
+        self.gripper_haptic_follow_bypass = bool(
+            rospy.get_param("~gripper_haptic_follow_bypass", True)
+        )
         self.gripper_haptic_effort_alpha = float(rospy.get_param("~gripper_haptic_effort_alpha", 0.2))
         self.gripper_haptic_effort_alpha = max(0.0, min(1.0, self.gripper_haptic_effort_alpha))
         self.gripper_haptic_release_when_opening = bool(
@@ -147,6 +153,10 @@ class C_PiperCtrlNode:
             self.gripper_haptic_release_when_opening,
             self.gripper_haptic_opening_relief,
             self.gripper_haptic_opening_sign,
+        )
+        rospy.loginfo(
+            "Gripper haptic follow bypass: %s",
+            self.gripper_haptic_follow_bypass,
         )
 
         # Control mode parameters
@@ -262,6 +272,17 @@ class C_PiperCtrlNode:
         
         # Current mode flag (False = teleop mode, True = slave follow mode)
         self.slave_follow_mode = False
+        # When True, force MIT position source from command topic even if follow flag is true.
+        self.force_master_cmd_mode = False
+        # In force-cmd alignment mode, optionally reuse follow-mode kp for stronger tracking.
+        self.force_cmd_use_follow_kp = bool(
+            rospy.get_param("~master_slave/force_cmd_use_follow_kp", True)
+        )
+        # In force-cmd alignment mode, optionally bypass joint-limit clamp.
+        # This helps when model limits do not perfectly match real teleop master range.
+        self.force_cmd_skip_joint_limit_clamp = bool(
+            rospy.get_param("~master_slave/force_cmd_skip_joint_limit_clamp", True)
+        )
         self.slave_follow_mode_lock = threading.Lock()
         
         # Master arm position storage
@@ -272,6 +293,13 @@ class C_PiperCtrlNode:
             rospy.loginfo("Master-slave switch enabled")
             rospy.loginfo("  Master position topic: %s", self.master_position_topic)
             rospy.loginfo("  Master flag topic: %s", self.master_flag_topic)
+            self.master_force_cmd_mode_topic = rospy.get_param(
+                "~master_slave/force_cmd_mode_flag_topic",
+                self.topic_prefix + "master_force_cmd_flag",
+            )
+            rospy.loginfo("  Master force-cmd topic: %s", self.master_force_cmd_mode_topic)
+            rospy.loginfo("  Force-cmd uses follow kp: %s", self.force_cmd_use_follow_kp)
+            rospy.loginfo("  Force-cmd skips joint clamp: %s", self.force_cmd_skip_joint_limit_clamp)
             rospy.loginfo("  kp for follow mode: %s", self.mit_kp_follow)
 
         rospy.loginfo("MIT control parameters: speed=%d", self.mit_speed)
@@ -521,6 +549,14 @@ class C_PiperCtrlNode:
                 tcp_nodelay=True,
             )
             rospy.loginfo("Subscribing to master flag: %s", self.master_flag_topic)
+            rospy.Subscriber(
+                self.master_force_cmd_mode_topic,
+                Bool,
+                self.master_force_cmd_mode_callback,
+                queue_size=1,
+                tcp_nodelay=True,
+            )
+            rospy.loginfo("Subscribing to master force-cmd flag: %s", self.master_force_cmd_mode_topic)
 
         # Thread control flags
         self.publish_thread_running = False
@@ -701,9 +737,16 @@ class C_PiperCtrlNode:
                     self.mit_kp = self.mit_kp_follow[:]
                     rospy.loginfo("Switched to SLAVE FOLLOW mode, kp=%s", self.mit_kp)
                 else:
-                    # Switch to teleop mode - use original low kp
+                    # Switch to teleop mode - use original kp
                     self.mit_kp = self.mit_kp_teleop[:]
                     rospy.loginfo("Switched to TELEOP mode, kp=%s", self.mit_kp)
+
+    def master_force_cmd_mode_callback(self, msg: Bool):
+        """When true, force master to consume command topic instead of follow source."""
+        with self.slave_follow_mode_lock:
+            if msg.data != self.force_master_cmd_mode:
+                self.force_master_cmd_mode = msg.data
+                rospy.loginfo("Switched MASTER FORCE-CMD mode: %s", self.force_master_cmd_mode)
 
     def _compute_gripper_haptic_effort_cmd(self):
         """Map signed measured gripper effort to a positive haptic command."""
@@ -822,8 +865,12 @@ class C_PiperCtrlNode:
         # Check if in slave follow mode (master arm leads, slave arm follows)
         # Also get current kp values under lock for thread safety
         with self.slave_follow_mode_lock:
-            is_slave_follow = self.slave_follow_mode and self.enable_master_slave_switch
-            current_kp = self.mit_kp[:]  # Copy kp values under lock
+            force_cmd_mode = self.force_master_cmd_mode and self.enable_master_slave_switch
+            is_slave_follow = self.slave_follow_mode and self.enable_master_slave_switch and not force_cmd_mode
+            if force_cmd_mode and self.force_cmd_use_follow_kp:
+                current_kp = self.mit_kp_follow[:]
+            else:
+                current_kp = self.mit_kp[:]  # Copy kp values under lock
         
         # Get master gripper position if in slave follow mode
         master_gripper_pos = 0.0
@@ -839,7 +886,7 @@ class C_PiperCtrlNode:
                     
             elif self.mit_enable_pos:
                 positions = self.joint_positions_cmd[:]
-                position_ref_source = "cmd"
+                position_ref_source = "cmd_forced" if force_cmd_mode else "cmd"
             else:
                 positions = self.current_joint_positions[:]
                 position_ref_source = "current"
@@ -855,7 +902,15 @@ class C_PiperCtrlNode:
                 torques = [0.0] * 6
 
         gravity_torques = [0.0] * 6
-        if self.mit_enable_gravity:
+        if force_cmd_mode:
+            # Alignment mode should be deterministic: position tracking only.
+            # External torque/gravity routing can oppose alignment and cause stalls.
+            torques = [0.0] * 6
+            rospy.loginfo_throttle(
+                1.0,
+                "force-cmd mode active: overriding torque/gravity feedforward to zero.",
+            )
+        elif self.mit_enable_gravity:
             with self.gravity_torques_lock:
                 gravity_torques = self.gravity_torques[:]
 
@@ -876,7 +931,14 @@ class C_PiperCtrlNode:
         # Only clamp external references. When using current joint state as ref
         # (mit_enable_pos:=false), clamping can create artificial position error
         # near model limits and feel like unexpected stiffness.
-        if position_ref_source != "current":
+        should_clamp_ref = position_ref_source != "current"
+        if position_ref_source == "cmd_forced" and self.force_cmd_skip_joint_limit_clamp:
+            should_clamp_ref = False
+            rospy.loginfo_throttle(
+                1.0,
+                "force-cmd mode active: skipping joint-limit clamp for alignment command.",
+            )
+        if should_clamp_ref:
             positions = self._clamp_joint_positions(positions, "mit/" + position_ref_source)
         for i in range(6):
             velocities[i] = max(-45.0, min(45.0, velocities[i]))
@@ -926,7 +988,10 @@ class C_PiperCtrlNode:
                 joint_6 = 0
 
             # Get effort from gripper command if haptic is enabled
-            if self.enable_gripper_haptic:
+            use_haptic = self.enable_gripper_haptic and not (
+                is_slave_follow and self.gripper_haptic_follow_bypass
+            )
+            if use_haptic:
                 gripper_effort = self._compute_gripper_haptic_effort_cmd()
                 gripper_code = 0x00 if gripper_effort < self.gripper_haptic_cmd_enable_threshold else 0x01
                 if gripper_code == 0x00:
@@ -1269,9 +1334,14 @@ class C_PiperCtrlNode:
         rospy.loginfo("piper go zero.")
         rospy.loginfo("-----------------------GOZERO---------------------------")
         if req.is_mit_mode:
-            self.piper.MotionCtrl_2(0x01, 0x01, 50, 0xAD)
+            go_zero_speed = int(rospy.get_param("~mit/speed", self.mit_speed))
         else:
-            self.piper.MotionCtrl_2(0x01, 0x01, 50, 0)
+            go_zero_speed = int(rospy.get_param("~p/speed", self.p_speed))
+        go_zero_speed = max(0, min(100, go_zero_speed))
+        if req.is_mit_mode:
+            self.piper.MotionCtrl_2(0x01, 0x01, go_zero_speed, 0xAD)
+        else:
+            self.piper.MotionCtrl_2(0x01, 0x01, go_zero_speed, 0)
         self.piper.JointCtrl(0, 0, 0, 0, 0, 0)
         response.status = True
         response.code = 151001
@@ -1428,3 +1498,8 @@ if __name__ == "__main__":
         node.Run()
     except rospy.ROSInterruptException:
         pass
+    except Exception as exc:
+        # Keep full traceback in ROS logs to avoid "silent exit code 1" failures.
+        rospy.logfatal("piper_ctrl_node startup failed: %s", str(exc))
+        rospy.logfatal(traceback.format_exc())
+        raise

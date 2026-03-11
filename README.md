@@ -4,6 +4,7 @@ A ROS 1 Noetic-based teleoperation system for Agilex Piper X robotic arms using 
 
 ## Table of Contents
 
+- [Documentation Guide](#documentation-guide)
 - [System Overview](#system-overview)
 - [Hardware Requirements](#hardware-requirements)
 - [Software Architecture](#software-architecture)
@@ -12,6 +13,40 @@ A ROS 1 Noetic-based teleoperation system for Agilex Piper X robotic arms using 
 - [Data Collection](#data-collection)
 - [Troubleshooting](#troubleshooting)
 - [File Structure](#file-structure)
+
+---
+
+## Documentation Guide
+
+Use this section as the top-level document router for this repository.
+
+### Start Here
+
+- Workspace and role-isolation overview:
+  `/home/jameszhao2004/catkin_ws/workspaces/README.md`
+- Daily launch baseline (English):
+  `/home/jameszhao2004/catkin_ws/workspaces/LAUNCH_RUNBOOK.md`
+- Daily launch baseline (Chinese):
+  `/home/jameszhao2004/catkin_ws/workspaces/LAUNCH_RUNBOOK_CN.md`
+- 3-arm intervention workflow (OPP switch + recorder):
+  `/home/jameszhao2004/catkin_ws/workspaces/RUNBOOK_3ARM_INTERVENTION.md`
+
+### Which Guide Should I Use?
+
+| Your task | Primary guide |
+|---|---|
+| Build/source isolated robot and teleop workspaces | `workspaces/README.md` |
+| Standard robot + teleop bring-up and troubleshooting | `workspaces/LAUNCH_RUNBOOK.md` |
+| 3-arm sessions with `arm_opp` and `opp_master_switch.py` | `workspaces/RUNBOOK_3ARM_INTERVENTION.md` |
+| Burst monitor pipeline operations | `README_burst_monitor.md` |
+| Docker/host environment setup | `DOCKER_SETUP_README.md` |
+
+### 3-Arm Critical Rule
+
+For 3-arm sessions, verify these before running `opp_master_switch.py`:
+
+- `/piper_gravity_compensation_node/enable_opp_arm` is `true`
+- `/robot/arm_opp/joint_states_compensated` is publishing
 
 ---
 

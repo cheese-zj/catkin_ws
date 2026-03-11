@@ -1,0 +1,10 @@
+setup.py
+lerobot_policy_act_augmented/__init__.py
+lerobot_policy_act_augmented/configuration_act_augmented.py
+lerobot_policy_act_augmented/modeling_act_augmented.py
+lerobot_policy_act_augmented/processor_act_augmented.py
+lerobot_policy_act_augmented.egg-info/PKG-INFO
+lerobot_policy_act_augmented.egg-info/SOURCES.txt
+lerobot_policy_act_augmented.egg-info/dependency_links.txt
+lerobot_policy_act_augmented.egg-info/requires.txt
+lerobot_policy_act_augmented.egg-info/top_level.txt

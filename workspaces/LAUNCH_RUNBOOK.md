@@ -3,6 +3,10 @@
 This is the lab runbook for launching robot-side and teleop-side stacks with
 role-isolated Catkin workspaces.
 
+For 3-arm intervention sessions (with `arm_opp` + `opp_master_switch.py`), use:
+
+- `/home/jameszhao2004/catkin_ws/workspaces/RUNBOOK_3ARM_INTERVENTION.md`
+
 ## 1) Lab CAN Naming
 
 Use these interface names in this lab:
@@ -114,6 +118,22 @@ Check USB port mapping first:
 
 ```bash
 bash /home/jameszhao2004/catkin_ws/find_all_camera_port.sh
+```
+
+Optional (for `enable_opp_camera:=true`): create a persistent OPP USB camera
+symlink once, then use it in launch args instead of `/dev/videoN`.
+
+```bash
+bash /home/jameszhao2004/catkin_ws/workspaces/scripts/install_opp_camera_udev_rule.sh \
+  --device /dev/video18 \
+  --symlink wrist_opp_camera
+```
+
+Then launch with:
+
+```bash
+opp_camera_usb_port:= \
+opp_camera_device:=/dev/wrist_opp_camera
 ```
 
 ## 6) Quick Health Checks
@@ -288,7 +308,9 @@ Design constraints (important):
 
 1. Robot + teleop stacks are already running.
 2. Inference environment is available (recommended: Python>=3.10 venv/uv venv inside ROS1 Docker).
-3. Checkpoint directory exists and contains `config.json` and `model.safetensors`.
+3. Since **February 23, 2026**, training and canonical policy storage are owned by `/home/jameszhao2004/training_codebase`.
+4. Sync policy aliases before loading checkpoint shortcuts:
+   `bash /home/jameszhao2004/training_codebase/pipeline/scripts/trainctl.sh policy-sync`
 
 ### 11.2 Start the policy publisher
 
@@ -297,7 +319,7 @@ source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
 source /home/jameszhao2004/catkin_ws/.venv_train_act/bin/activate
 
 python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/run_act_checkpoint_ros.py \
-  --checkpoint-dir /home/jameszhao2004/catkin_ws/outputs/train/act_20260218_smoke/checkpoints/000200/pretrained_model \
+  --checkpoint-dir /home/jameszhao2004/catkin_ws/policies/by_run/<run_name>/best \
   --device cuda \
   --rate 20 \
   --temporal-ensemble-coeff 0.01 \
@@ -332,6 +354,7 @@ rosservice call /robot/arm_right/joint_cmd_mux_select /teleop/arm_right/joint_st
 Teleop follow mode is also external:
 
 ```bash
+source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_teleop.sh
 bash /home/jameszhao2004/catkin_ws/workspaces/scripts/set_teleop_mode.sh follow
 bash /home/jameszhao2004/catkin_ws/workspaces/scripts/set_teleop_mode.sh teleop
 ```
@@ -358,7 +381,7 @@ Verification checklist:
 source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
 source /home/jameszhao2004/catkin_ws/.venv_train_act/bin/activate
 python3 /home/jameszhao2004/catkin_ws/workspaces/scripts/run_act_checkpoint_ros.py \
-  --checkpoint-dir /home/jameszhao2004/catkin_ws/outputs/train/act_20260218_smoke/checkpoints/000200/pretrained_model \
+  --checkpoint-dir /home/jameszhao2004/catkin_ws/policies/by_run/<run_name>/best \
   --device cuda \
   --rate 20 \
   --temporal-ensemble-coeff 0.01 \

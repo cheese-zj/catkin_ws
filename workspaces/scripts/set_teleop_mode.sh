@@ -8,12 +8,53 @@ set -euo pipefail
 # Default mode is "teleop".
 
 MODE="${1:-teleop}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ "${MODE}" != "teleop" && "${MODE}" != "follow" ]]; then
   echo "[set_teleop_mode] Invalid mode: ${MODE}" >&2
   echo "Usage: $0 [teleop|follow]" >&2
   exit 1
 fi
+
+have_piper_enable_type() {
+  python3 -c 'import piper_msgs.srv' >/dev/null 2>&1
+}
+
+ensure_piper_enable_type() {
+  if have_piper_enable_type; then
+    return 0
+  fi
+
+  # Prefer teleop role workspace; fall back to robot role if needed.
+  if [[ -f "${SCRIPT_DIR}/use_teleop.sh" ]]; then
+    # shellcheck disable=SC1091
+    source "${SCRIPT_DIR}/use_teleop.sh" >/dev/null 2>&1 || true
+  fi
+  if have_piper_enable_type; then
+    return 0
+  fi
+
+  if [[ -f "${SCRIPT_DIR}/use_robot.sh" ]]; then
+    # shellcheck disable=SC1091
+    source "${SCRIPT_DIR}/use_robot.sh" >/dev/null 2>&1 || true
+  fi
+  if have_piper_enable_type; then
+    return 0
+  fi
+
+  cat >&2 <<EOF
+[set_teleop_mode] Missing ROS service type piper_msgs/Enable in current shell.
+[set_teleop_mode] Source a role workspace and try again:
+
+  source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_teleop.sh
+  # or
+  source /home/jameszhao2004/catkin_ws/workspaces/scripts/use_robot.sh
+
+[set_teleop_mode] If sourcing fails, build first:
+  /home/jameszhao2004/catkin_ws/workspaces/scripts/build_teleop_ws.sh
+EOF
+  return 1
+}
 
 wait_for_service() {
   local svc="$1"
@@ -28,6 +69,8 @@ wait_for_service() {
     sleep 0.2
   done
 }
+
+ensure_piper_enable_type
 
 echo "[set_teleop_mode] Waiting for teleop enable services..."
 wait_for_service "/teleop/arm_left/enable_srv" 15

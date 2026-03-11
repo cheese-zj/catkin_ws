@@ -93,12 +93,15 @@ class Recorder:
         self.camera_health_topics = [entry["image_base"] for entry in self.camera_streams]
         self.camera_info_topics = [entry["camera_info"] for entry in self.camera_streams]
         self.required_presence_topics = self._build_required_presence_topics()
-        self.required_joint_topics = [
+        default_required_joint_topics = [
             "/robot/arm_left/joint_states_single",
             "/robot/arm_right/joint_states_single",
             "/teleop/arm_left/joint_states_single",
             "/teleop/arm_right/joint_states_single",
         ]
+        self.required_joint_topics = list(
+            self.profile.get("required_joint_topics", default_required_joint_topics)
+        )
         self.profile_record_topics = dedup_keep_order(self.required_topics + self.camera_record_topics)
 
         self.session_root = Path(args.session_root).expanduser().resolve()
@@ -191,6 +194,8 @@ class Recorder:
         for entry in profile["camera_streams"]:
             if "image_base" not in entry or "camera_info" not in entry:
                 raise RuntimeError("camera_streams entries must include image_base and camera_info")
+        if "required_joint_topics" in profile and not isinstance(profile["required_joint_topics"], list):
+            raise RuntimeError("required_joint_topics must be a list when provided")
 
     def _build_camera_record_topics(self) -> List[str]:
         topics: List[str] = []

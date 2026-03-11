@@ -1,4 +1,9 @@
 <launch>
+  <arg name="enforce_joint_limits" default="true" />
+  <arg name="enable_opp_arm" default="false" />
+  <arg name="left_can_port" default="can_left" />
+  <arg name="right_can_port" default="can_right" />
+  <arg name="opp_can_port" default="can_opp" />
   <!-- 
     Piper Dual Robot Launch
     
@@ -16,11 +21,14 @@
     <rosparam file="$(find piper_ctrl)/config/piper_ctrl_mit.yaml" command="load"/>
     <!-- Load node-specific parameters (piper_ctrl_left_node key maps to this node) -->
     <rosparam file="$(find piper_ctrl)/config/piper_dual.yaml" command="load" ns="/"/>
+    <param name="can_port" value="$(arg left_can_port)" />
+    <param name="enforce_joint_limits" value="$(arg enforce_joint_limits)" />
   </node>
 
     <node pkg="topic_tools" type="mux" name="mux_arm_left_joint"
           args="/robot/arm_left/joint_cmd_mux
                 /robot/arm_left/vla_joint_cmd
+                /robot/arm_left/hold_joint_cmd
                 /teleop/arm_left/joint_states_single"
           output="screen">
         <param name="~default" value="/teleop/arm_left/joint_states_single" /> 
@@ -33,15 +41,40 @@
     <rosparam file="$(find piper_ctrl)/config/piper_ctrl_mit.yaml" command="load"/>
     <!-- Load node-specific parameters (piper_ctrl_right_node key maps to this node) -->
     <rosparam file="$(find piper_ctrl)/config/piper_dual.yaml" command="load" ns="/"/>
+    <param name="can_port" value="$(arg right_can_port)" />
+    <param name="enforce_joint_limits" value="$(arg enforce_joint_limits)" />
   </node>
 <!-- 这个是可以选择joint话题，即用什么 -->
     <node pkg="topic_tools" type="mux" name="mux_arm_right_joint"
           args="/robot/arm_right/joint_cmd_mux
                 /robot/arm_right/vla_joint_cmd
+                /robot/arm_right/hold_joint_cmd
                 /teleop/arm_right/joint_states_single"
           output="screen">
         <param name="~default" value="/teleop/arm_right/joint_states_single"/>
     </node>
+
+  <group if="$(arg enable_opp_arm)">
+    <!-- Opp arm node -->
+    <node name="piper_ctrl_opp_node" pkg="piper_ctrl" type="piper_ctrl_node.py" output="screen">
+      <!-- Load control parameters to node's private namespace -->
+      <rosparam file="$(find piper_ctrl)/config/piper_ctrl_mit.yaml" command="load"/>
+      <!-- Load node-specific parameters (piper_ctrl_opp_node key maps to this node) -->
+      <rosparam file="$(find piper_ctrl)/config/piper_dual.yaml" command="load" ns="/"/>
+      <param name="can_port" value="$(arg opp_can_port)" />
+      <param name="enforce_joint_limits" value="$(arg enforce_joint_limits)" />
+    </node>
+
+    <node pkg="topic_tools" type="mux" name="mux_arm_opp_joint"
+          args="/robot/arm_opp/joint_cmd_mux
+                /robot/arm_opp/vla_joint_cmd
+                /teleop/arm_left/joint_states_single
+                /teleop/arm_right/joint_states_single
+                /robot/arm_opp/hold_joint_cmd"
+          output="screen">
+      <param name="~default" value="/robot/arm_opp/hold_joint_cmd" />
+    </node>
+  </group>
 
   <!-- 启动后自动选择 teleop 模式 -->
   <node pkg="rosservice" type="rosservice" name="init_mux_left"
@@ -49,5 +82,9 @@
         output="screen"/>
   <node pkg="rosservice" type="rosservice" name="init_mux_right"
         args="call --wait /robot/arm_right/joint_cmd_mux_select /teleop/arm_right/joint_states_single"
-        output="screen"/> 
+        output="screen"/>
+  <node if="$(arg enable_opp_arm)"
+        pkg="rosservice" type="rosservice" name="init_mux_opp"
+        args="call --wait /robot/arm_opp/joint_cmd_mux_select /robot/arm_opp/hold_joint_cmd"
+        output="screen"/>
 </launch>

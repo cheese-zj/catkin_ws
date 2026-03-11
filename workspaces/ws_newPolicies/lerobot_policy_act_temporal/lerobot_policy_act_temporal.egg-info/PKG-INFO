@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: lerobot_policy_act_temporal
+Version: 0.1.0
+Summary: ACT + Temporal Self-Attention via Recurrent Feature Buffer (LeRobot plugin)
+Requires-Python: >=3.10
+Requires-Dist: lerobot
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
