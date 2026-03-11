@@ -1,3 +1,7 @@
+> Scratch notes only. Canonical docs are:
+> `/home/jameszhao2004/catkin_ws/DOCS.md`
+> `/home/jameszhao2004/catkin_ws/RUNBOOK_3ARM_INTERVENTION.md`
+
 bash can_activate.sh can_ml 1000000 1-7.4.3:1.0
 bash can_activate.sh can_mr 1000000 1-7.4.4:1.0
 bash can_activate.sh can_sl 1000000 1-7.4.2.4:1.0

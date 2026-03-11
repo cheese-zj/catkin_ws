@@ -22,22 +22,25 @@ Use this section as the top-level document router for this repository.
 
 ### Start Here
 
+- Full documentation map and maintenance rules:
+  `/home/jameszhao2004/catkin_ws/DOCS.md`
 - Workspace and role-isolation overview:
-  `/home/jameszhao2004/catkin_ws/workspaces/README.md`
+  `/home/jameszhao2004/catkin_ws/WORKSPACES.md`
 - Daily launch baseline (English):
-  `/home/jameszhao2004/catkin_ws/workspaces/LAUNCH_RUNBOOK.md`
+  `/home/jameszhao2004/catkin_ws/LAUNCH_RUNBOOK.md`
 - Daily launch baseline (Chinese):
-  `/home/jameszhao2004/catkin_ws/workspaces/LAUNCH_RUNBOOK_CN.md`
+  `/home/jameszhao2004/catkin_ws/LAUNCH_RUNBOOK_CN.md`
 - 3-arm intervention workflow (OPP switch + recorder):
-  `/home/jameszhao2004/catkin_ws/workspaces/RUNBOOK_3ARM_INTERVENTION.md`
+  `/home/jameszhao2004/catkin_ws/RUNBOOK_3ARM_INTERVENTION.md`
 
 ### Which Guide Should I Use?
 
 | Your task | Primary guide |
 |---|---|
-| Build/source isolated robot and teleop workspaces | `workspaces/README.md` |
-| Standard robot + teleop bring-up and troubleshooting | `workspaces/LAUNCH_RUNBOOK.md` |
-| 3-arm sessions with `arm_opp` and `opp_master_switch.py` | `workspaces/RUNBOOK_3ARM_INTERVENTION.md` |
+| Build/source isolated robot and teleop workspaces | `WORKSPACES.md` |
+| Standard robot + teleop bring-up and troubleshooting | `LAUNCH_RUNBOOK.md` |
+| 3-arm sessions with `arm_opp` and `opp_master_switch.py` | `RUNBOOK_3ARM_INTERVENTION.md` |
+| Documentation ownership and where to edit | `DOCS.md` |
 | Burst monitor pipeline operations | `README_burst_monitor.md` |
 | Docker/host environment setup | `DOCKER_SETUP_README.md` |
 

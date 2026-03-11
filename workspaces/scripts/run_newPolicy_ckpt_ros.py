@@ -192,8 +192,14 @@ class PolicyPublisherNode:
                 local_files_only=True,
                 cli_overrides=cli_overrides,
             )
-        elif self.args.policy_type == "act-temporal":
+        elif 'temporal' in self.args.policy_type:
             policy = ACTTemporalPolicy.from_pretrained(
+                str(ckpt),
+                local_files_only=True,
+                cli_overrides=cli_overrides,
+            )
+        elif self.args.policy_type == "act-optflow" or self.args.policy_type == "act-framediff" or self.args.policy_type == "act-framestack":
+            policy = ACTAugmentedPolicy.from_pretrained(
                 str(ckpt),
                 local_files_only=True,
                 cli_overrides=cli_overrides,
@@ -622,13 +628,23 @@ def main():
             raise SystemExit(
                 "lerobot is required in this environment. Use Python>=3.10 venv in ROS container."
             ) from exc
-    elif args.policy_type == 'act-temporal':
+    elif 'temporal' in args.policy_type:
         try:
             from lerobot_policy_act_temporal import ACTTemporalPolicy
-            from lerobot.policies.factory import make_pre_post_processors
+            # from lerobot.policies.factory import make_pre_post_processors
+            from lerobot_policy_act_temporal import make_pre_post_processors
         except Exception as exc:  # pragma: no cover
             raise SystemExit(
                 "lerobot_policy_act_temporal is required in this environment. Use Python>=3.10 venv in ROS container."
+            ) from exc
+    elif args.policy_type == "act-optflow" or args.policy_type == "act-framediff" or args.policy_type == "act-framestack":
+        try:
+            from lerobot_policy_act_augmented import ACTAugmentedPolicy
+            # from lerobot.policies.factory import make_pre_post_processors
+            from lerobot_policy_act_augmented import make_pre_post_processors
+        except Exception as exc:  # pragma: no cover
+            raise SystemExit(
+                "lerobot_policy_act_augmented is required in this environment. Use Python>=3.10 venv in ROS container."
             ) from exc
 
     rospy.init_node("run_act_checkpoint_ros")

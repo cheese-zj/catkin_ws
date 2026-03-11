@@ -2,7 +2,7 @@
 
 Handoff summary for future Codex sessions in this workspace.
 
-Last updated: **2026-02-21**
+Last updated: **2026-03-11**
 
 ## Scope and Goal
 
@@ -48,8 +48,10 @@ Notes:
 
 Source of truth for launch and diagnostics:
 
-- English: `workspaces/LAUNCH_RUNBOOK.md`
-- Chinese: `workspaces/LAUNCH_RUNBOOK_CN.md`
+- Workspace and role-isolation overview: `WORKSPACES.md`
+- English: `LAUNCH_RUNBOOK.md`
+- Chinese: `LAUNCH_RUNBOOK_CN.md`
+- 3-arm intervention workflow: `RUNBOOK_3ARM_INTERVENTION.md`
 
 Keep AGENTS concise; put detailed operator flow in runbooks above.
 

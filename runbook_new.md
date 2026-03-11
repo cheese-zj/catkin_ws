@@ -3,9 +3,9 @@
 This file is kept as an operator scratchpad.
 Canonical guidebooks are now:
 
-- `/home/jameszhao2004/catkin_ws/workspaces/README.md`
-- `/home/jameszhao2004/catkin_ws/workspaces/LAUNCH_RUNBOOK.md`
-- `/home/jameszhao2004/catkin_ws/workspaces/RUNBOOK_3ARM_INTERVENTION.md`
+- `/home/jameszhao2004/catkin_ws/WORKSPACES.md`
+- `/home/jameszhao2004/catkin_ws/LAUNCH_RUNBOOK.md`
+- `/home/jameszhao2004/catkin_ws/RUNBOOK_3ARM_INTERVENTION.md`
 
 
 # Runbook v1.0

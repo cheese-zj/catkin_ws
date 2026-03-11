@@ -46,3 +46,13 @@ data/
 outputs/
 burst_out/
 policies/
+
+# Local checkpoint / weight artifacts (do not commit)
+/ckpts/
+/piper_sdk/
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.onnx
+*.weights
