@@ -1,3 +1,7 @@
+> Scratch notes only. Canonical docs are:
+> `/home/jameszhao2004/catkin_ws/DOCS.md`
+> `/home/jameszhao2004/catkin_ws/RUNBOOK_3ARM_INTERVENTION.md`
+
 # T1
 ros1
 roscore
